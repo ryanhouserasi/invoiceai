@@ -1,0 +1,1103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0a0a0a">
+<title>invoiceAI</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#0a0a0a;
+  --card:#141414;
+  --card2:#1c1c1c;
+  --border:#242424;
+  --lime:#d4f54e;
+  --lime-dim:rgba(212,245,78,.1);
+  --teal:#4ee8d4;
+  --teal-dim:rgba(78,232,212,.1);
+  --red:#f5524e;
+  --red-dim:rgba(245,82,78,.1);
+  --text:#f4f1eb;
+  --muted:#4a4a4a;
+  --muted2:#666;
+  --radius:16px;
+  --safe-bottom:env(safe-area-inset-bottom, 0px);
+}
+
+html{height:100%;background:var(--bg)}
+body{
+  min-height:100%;background:var(--bg);color:var(--text);
+  font-family:'Space Grotesk',sans-serif;
+  padding-bottom:calc(80px + var(--safe-bottom));
+  overflow-x:hidden;
+}
+
+/* ── TAB BAR ── */
+.tab-bar{
+  position:fixed;bottom:0;left:0;right:0;
+  height:calc(68px + var(--safe-bottom));
+  background:rgba(14,14,14,.96);
+  border-top:1px solid var(--border);
+  display:flex;align-items:flex-start;padding-top:8px;
+  padding-bottom:var(--safe-bottom);
+  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  z-index:100;
+}
+.tab{
+  flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;
+  background:none;border:none;color:var(--muted2);cursor:pointer;
+  font-family:'Space Grotesk',sans-serif;font-size:11px;font-weight:600;
+  letter-spacing:.3px;padding:0;transition:.15s;
+}
+.tab.active{color:var(--lime)}
+.tab-icon{font-size:22px;line-height:1;transition:.15s}
+.tab.active .tab-icon{filter:drop-shadow(0 0 8px rgba(212,245,78,.5))}
+
+/* ── TOP BAR ── */
+.top-bar{
+  position:sticky;top:0;z-index:50;
+  background:rgba(10,10,10,.92);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  border-bottom:1px solid var(--border);
+  padding:16px 20px 14px;
+  display:flex;align-items:center;gap:12px;
+}
+.top-logo{font-size:18px;font-weight:700;letter-spacing:-.3px}
+.top-logo em{color:var(--lime);font-style:normal}
+.top-right{margin-left:auto;display:flex;align-items:center;gap:8px}
+.top-badge{
+  background:var(--lime-dim);border:1px solid rgba(212,245,78,.25);
+  color:var(--lime);font-family:'JetBrains Mono',monospace;font-size:10px;
+  padding:3px 10px;border-radius:20px;
+}
+
+/* ── PAGES ── */
+.page{display:none;min-height:calc(100vh - 80px)}
+.page.active{display:block}
+
+/* ── SECTION HEADERS ── */
+.section{padding:20px 20px 0}
+.section-label{
+  font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:2px;
+  text-transform:uppercase;color:var(--lime);margin-bottom:14px;
+  display:flex;align-items:center;gap:8px;
+}
+.section-label::before{content:'';width:5px;height:5px;background:var(--lime);border-radius:50%;flex-shrink:0}
+
+/* ── CARDS ── */
+.card{
+  background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+  overflow:hidden;margin-bottom:12px;
+}
+.card-pad{padding:16px}
+
+/* ── SPREADSHEET SAVED CARD ── */
+.sheet-saved{
+  background:var(--card);border:1px solid rgba(212,245,78,.2);border-radius:var(--radius);
+  padding:14px 16px;display:flex;align-items:center;gap:12px;margin-bottom:12px;
+}
+.sheet-saved-icon{font-size:24px;flex-shrink:0}
+.sheet-saved-info{flex:1;min-width:0}
+.sheet-saved-name{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sheet-saved-sub{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--lime);margin-top:2px}
+.sheet-replace-btn{
+  background:var(--card2);border:1px solid var(--border);color:var(--muted2);
+  font-family:'Space Grotesk',sans-serif;font-size:11px;font-weight:600;
+  padding:6px 12px;border-radius:8px;cursor:pointer;flex-shrink:0;
+}
+
+/* ── DROP ZONES ── */
+.drop-zone{
+  border:2px dashed var(--border);border-radius:12px;
+  padding:32px 20px;text-align:center;cursor:pointer;
+  position:relative;transition:.2s;background:rgba(255,255,255,.01);
+}
+.drop-zone:active{border-color:var(--lime);background:var(--lime-dim)}
+.drop-zone.drag-over{border-color:var(--lime);background:var(--lime-dim)}
+.drop-zone input{position:absolute;inset:0;opacity:0;cursor:pointer;font-size:16px}
+.dz-icon{font-size:36px;margin-bottom:10px}
+.dz-title{font-size:15px;font-weight:700;margin-bottom:4px}
+.dz-sub{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted2);line-height:1.6}
+
+/* ── COL CONFIG ── */
+.col-config{
+  background:var(--card2);border-radius:10px;padding:14px;
+  margin-top:12px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;
+}
+.cf-field label{
+  display:block;font-family:'JetBrains Mono',monospace;font-size:9px;
+  letter-spacing:1.5px;text-transform:uppercase;color:var(--muted2);margin-bottom:5px;
+}
+.cf-field input,.cf-field select{
+  width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);
+  padding:9px 10px;border-radius:8px;font-family:'JetBrains Mono',monospace;font-size:12px;
+  -webkit-appearance:none;appearance:none;
+}
+.cf-field input:focus,.cf-field select:focus{outline:none;border-color:var(--lime)}
+
+/* ── INVOICE QUEUE ── */
+.queue-list{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
+.qi{
+  background:var(--card);border:1px solid var(--border);border-radius:12px;
+  padding:12px 14px;display:flex;align-items:center;gap:12px;
+  transition:.15s;
+}
+.qi.done{border-color:rgba(78,232,212,.25)}
+.qi.processing{border-color:rgba(212,245,78,.2)}
+.qi.error{border-color:rgba(245,82,78,.25)}
+.qi-thumb{
+  width:44px;height:44px;border-radius:8px;overflow:hidden;
+  background:var(--card2);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:20px;
+}
+.qi-thumb img{width:100%;height:100%;object-fit:cover}
+.qi-body{flex:1;min-width:0}
+.qi-name{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.qi-status{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted2);margin-top:3px}
+.qi-del{
+  background:none;border:none;color:var(--muted);font-size:18px;
+  cursor:pointer;padding:4px 6px;border-radius:6px;line-height:1;flex-shrink:0;
+}
+.qi-del:active{background:var(--red-dim);color:var(--red)}
+
+/* ── CAMERA BUTTON ── */
+.cam-btn{
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  width:100%;padding:18px;border-radius:12px;border:none;cursor:pointer;
+  background:var(--lime);color:#0a0a0a;
+  font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;
+  position:relative;overflow:hidden;transition:.1s;
+  -webkit-appearance:none;
+}
+.cam-btn:active{filter:brightness(.92);transform:scale(.98)}
+.cam-btn input{position:absolute;inset:0;opacity:0;cursor:pointer;font-size:16px}
+.cam-btn-icon{font-size:22px}
+
+/* ── ANALYZE BUTTON ── */
+.analyze-btn{
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  width:100%;padding:18px;border-radius:12px;border:none;cursor:pointer;
+  background:var(--lime);color:#0a0a0a;
+  font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;
+  transition:.1s;margin-bottom:8px;
+}
+.analyze-btn:active:not(:disabled){filter:brightness(.92);transform:scale(.98)}
+.analyze-btn:disabled{opacity:.35;cursor:not-allowed}
+
+/* ── STATUS ── */
+.status-pill{
+  display:flex;align-items:center;gap:8px;
+  background:var(--card);border:1px solid var(--border);border-radius:10px;
+  padding:12px 14px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--muted2);
+  margin-bottom:12px;
+}
+.status-pill.loading{color:var(--teal);border-color:rgba(78,232,212,.25)}
+.status-pill.ok{color:var(--lime);border-color:rgba(212,245,78,.25)}
+.status-pill.error{color:var(--red);border-color:rgba(245,82,78,.25)}
+.spin{width:13px;height:13px;border:2px solid currentColor;border-top-color:transparent;border-radius:50%;animation:spin .6s linear infinite;flex-shrink:0}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── INVOICE RESULT BLOCKS ── */
+.inv-block{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:12px;overflow:hidden}
+.inv-block-hdr{
+  padding:14px 16px;display:flex;align-items:center;gap:10px;
+  cursor:pointer;user-select:none;-webkit-user-select:none;
+}
+.inv-block-hdr:active{background:rgba(255,255,255,.02)}
+.ibh-icon{font-size:20px;flex-shrink:0}
+.ibh-info{flex:1;min-width:0}
+.ibh-name{font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ibh-meta{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted2);margin-top:2px}
+.ibh-right{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0}
+.ibh-chevron{font-size:14px;color:var(--muted);transition:.2s}
+.inv-block.collapsed .ibh-chevron{transform:rotate(-90deg)}
+.inv-block.collapsed .inv-block-body{display:none}
+.inv-block-body{border-top:1px solid var(--border)}
+
+/* ── MATCH ROWS (mobile optimized) ── */
+.match-row{
+  padding:12px 16px;border-bottom:1px solid rgba(255,255,255,.04);
+  display:flex;align-items:flex-start;gap:10px;
+}
+.match-row:last-child{border-bottom:none}
+.match-row:active{background:rgba(255,255,255,.02)}
+.mr-check{margin-top:2px;flex-shrink:0}
+.mr-check input{width:20px;height:20px;accent-color:var(--lime);cursor:pointer;border-radius:4px}
+.mr-body{flex:1;min-width:0}
+.mr-inv-name{font-size:13px;font-weight:600}
+.mr-inv-price{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted2);margin-top:2px}
+.mr-match-name{font-size:12px;color:var(--text);margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,.05)}
+.mr-right{display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0}
+.mr-price-change{font-family:'JetBrains Mono',monospace;font-size:11px;text-align:right}
+.price-up{color:var(--red)}
+.price-dn{color:var(--lime)}
+.price-eq{color:var(--muted2)}
+.price-nw{color:var(--teal)}
+.badge{display:inline-block;font-family:'JetBrains Mono',monospace;font-size:9px;padding:2px 7px;border-radius:20px;letter-spacing:.3px}
+.b-hi{background:rgba(212,245,78,.1);color:var(--lime)}
+.b-md{background:rgba(240,192,96,.1);color:#f0c060}
+.b-no{background:var(--red-dim);color:var(--red)}
+
+.no-match-label{font-size:12px;color:var(--muted2);font-style:italic}
+
+/* ── DOWNLOAD STICKY ── */
+.dl-sticky{
+  position:fixed;bottom:calc(68px + var(--safe-bottom));left:0;right:0;
+  padding:12px 20px;background:rgba(10,10,10,.96);border-top:1px solid var(--border);
+  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  display:none;z-index:90;
+}
+.dl-sticky.visible{display:block}
+.dl-sticky-inner{
+  display:flex;align-items:center;gap:12px;
+  background:var(--lime);border-radius:12px;padding:14px 18px;cursor:pointer;
+}
+.dl-sticky-inner:active{filter:brightness(.92)}
+.dl-text{flex:1}
+.dl-title{font-size:15px;font-weight:700;color:#0a0a0a}
+.dl-sub{font-family:'JetBrains Mono',monospace;font-size:10px;color:rgba(10,10,10,.6);margin-top:1px}
+.dl-arrow{font-size:24px;color:#0a0a0a}
+
+/* ── PILLS ── */
+.pill{display:inline-block;padding:3px 9px;border-radius:20px;font-family:'JetBrains Mono',monospace;font-size:10px}
+.p-lime{background:var(--lime-dim);color:var(--lime)}
+.p-red{background:var(--red-dim);color:var(--red)}
+.p-teal{background:var(--teal-dim);color:var(--teal)}
+
+/* ── HISTORY PAGE ── */
+.ing-search{
+  width:100%;background:var(--card2);border:1px solid var(--border);
+  color:var(--text);padding:13px 16px;border-radius:12px;
+  font-family:'Space Grotesk',sans-serif;font-size:15px;
+  -webkit-appearance:none;margin-bottom:12px;
+}
+.ing-search:focus{outline:none;border-color:var(--lime)}
+
+.ing-item{
+  background:var(--card);border:1px solid var(--border);border-radius:12px;
+  padding:14px 16px;margin-bottom:8px;cursor:pointer;transition:.12s;
+  display:flex;align-items:center;justify-content:space-between;
+}
+.ing-item:active,.ing-item.active{border-color:rgba(212,245,78,.35);background:var(--lime-dim)}
+.ing-item-name{font-size:14px;font-weight:600}
+.ing-item-sub{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted2);margin-top:3px}
+.ing-item-price{font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:var(--lime)}
+
+/* ── CHART ── */
+.chart-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:18px;margin-bottom:12px}
+.chart-name{font-size:20px;font-weight:700;margin-bottom:2px}
+.chart-meta{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted2);margin-bottom:16px}
+.chart-stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:18px}
+.chart-stat{background:var(--card2);border-radius:10px;padding:10px 12px;text-align:center}
+.chart-stat-val{font-size:18px;font-weight:700;font-family:'JetBrains Mono',monospace}
+.chart-stat-lbl{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted2);margin-top:3px;text-transform:uppercase;letter-spacing:1px}
+.chart-svg{width:100%;overflow:visible;display:block}
+
+.hist-row{
+  background:var(--card);border:1px solid var(--border);border-radius:12px;
+  padding:14px 16px;margin-bottom:8px;
+}
+.hist-row-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.hist-date{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted2)}
+.hist-chg{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700}
+.hist-row-bot{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.hist-price{font-family:'JetBrains Mono',monospace;font-size:12px}
+.hist-vendor{font-size:11px;color:var(--muted2)}
+
+.empty-state{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  min-height:300px;text-align:center;color:var(--muted2);padding:40px 20px;
+}
+.empty-icon{font-size:52px;margin-bottom:16px;opacity:.35}
+.empty-text{font-family:'JetBrains Mono',monospace;font-size:12px;line-height:2;color:var(--muted2)}
+
+/* ── SETTINGS PAGE ── */
+.settings-row{
+  background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+  padding:16px;margin-bottom:10px;
+}
+.settings-row-title{font-size:14px;font-weight:600;margin-bottom:4px}
+.settings-row-sub{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted2);line-height:1.6}
+.settings-btn{
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  width:100%;padding:13px;border-radius:10px;border:1px solid var(--border);
+  background:var(--card2);color:var(--text);
+  font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:600;
+  cursor:pointer;margin-top:10px;transition:.1s;position:relative;overflow:hidden;
+}
+.settings-btn input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.settings-btn:active{border-color:var(--lime);color:var(--lime)}
+.settings-btn.danger{color:var(--red);border-color:rgba(245,82,78,.25)}
+.settings-btn.danger:active{background:var(--red-dim)}
+
+.divider{height:1px;background:var(--border);margin:4px 0 14px}
+
+/* ── TOAST ── */
+.toast{
+  position:fixed;top:80px;left:50%;transform:translateX(-50%) translateY(-20px);
+  background:#1a1a1a;border:1px solid var(--border);border-radius:10px;
+  padding:10px 18px;font-family:'JetBrains Mono',monospace;font-size:12px;
+  color:var(--text);z-index:200;opacity:0;transition:.25s;white-space:nowrap;
+  pointer-events:none;max-width:90vw;overflow:hidden;text-overflow:ellipsis;
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<!-- PAGE: SCAN -->
+<div class="page active" id="pageScan">
+  <div class="top-bar">
+    <div class="top-logo">invoice<em>AI</em></div>
+    <div class="top-right">
+      <div class="top-badge" id="histBadge" style="display:none">0 saved</div>
+    </div>
+  </div>
+
+  <!-- Spreadsheet status -->
+  <div class="section" style="padding-top:20px">
+    <div class="section-label">Your Spreadsheet</div>
+    <div id="sheetSavedCard" style="display:none">
+      <div class="sheet-saved">
+        <div class="sheet-saved-icon">📊</div>
+        <div class="sheet-saved-info">
+          <div class="sheet-saved-name" id="sheetSavedName">spreadsheet.xlsx</div>
+          <div class="sheet-saved-sub">✓ stored on device</div>
+        </div>
+        <button class="sheet-replace-btn" onclick="document.getElementById('sheetReplaceInput').click()">Replace</button>
+        <input type="file" id="sheetReplaceInput" accept=".xlsx,.xls,.csv" style="display:none" />
+      </div>
+      <div class="col-config" id="colConfigSaved">
+        <div class="cf-field"><label>Sheet</label><select id="sheetSelectorSaved"></select></div>
+        <div class="cf-field"><label>Name Col</label><input id="nameColSaved" value="A" maxlength="3" /></div>
+        <div class="cf-field"><label>Price Col</label><input id="priceColSaved" value="B" maxlength="3" /></div>
+      </div>
+    </div>
+    <div id="sheetUploadCard">
+      <div class="drop-zone" id="sheetDrop">
+        <input type="file" id="sheetFile" accept=".xlsx,.xls,.csv" />
+        <div class="dz-icon">📊</div>
+        <div class="dz-title">Upload your spreadsheet</div>
+        <div class="dz-sub">Saved on device — never upload again<br>.xlsx · .xls · .csv</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Invoice photos -->
+  <div class="section" style="padding-top:18px">
+    <div class="section-label">Invoice Photos</div>
+
+    <!-- Camera button -->
+    <button class="cam-btn" style="margin-bottom:10px">
+      <input type="file" id="invoiceCapture" accept="image/*" capture="environment" multiple />
+      <span class="cam-btn-icon">📷</span>
+      Take Invoice Photo
+    </button>
+
+    <!-- Or upload from library -->
+    <div class="drop-zone" style="padding:20px;margin-bottom:12px" id="invoiceDrop">
+      <input type="file" id="invoiceFiles" accept="image/*" multiple />
+      <div class="dz-icon" style="font-size:28px">🖼️</div>
+      <div class="dz-title" style="font-size:14px">Choose from library</div>
+      <div class="dz-sub">or drag & drop · multiple OK</div>
+    </div>
+
+    <!-- Queue -->
+    <div class="queue-list" id="queueList"></div>
+
+    <!-- Analyze -->
+    <button class="analyze-btn" id="analyzeBtn" disabled>✦ Analyze Invoices</button>
+
+    <!-- Status -->
+    <div id="statusWrap" style="display:none">
+      <div class="status-pill" id="statusPill">Ready</div>
+    </div>
+  </div>
+
+  <!-- Results -->
+  <div class="section" style="padding-top:8px" id="resultsSection" style="display:none">
+    <div class="section-label" id="resultsLabel" style="display:none">Results</div>
+    <div id="invoiceResults"></div>
+  </div>
+
+  <div style="height:20px"></div>
+</div>
+
+<!-- PAGE: HISTORY -->
+<div class="page" id="pageHistory">
+  <div class="top-bar">
+    <div class="top-logo">Price <em>History</em></div>
+  </div>
+  <div class="section" style="padding-top:20px">
+    <input class="ing-search" id="ingSearch" placeholder="Search ingredients…" oninput="renderIngList()" />
+    <div id="ingListEl"></div>
+  </div>
+  <div class="section" id="ingDetailSection" style="display:none;padding-top:8px">
+    <div class="section-label" id="ingDetailLabel">Trend</div>
+    <div id="ingDetail"></div>
+  </div>
+  <div style="height:20px"></div>
+</div>
+
+<!-- PAGE: SETTINGS -->
+<div class="page" id="pageSettings">
+  <div class="top-bar">
+    <div class="top-logo">invoice<em>AI</em> Settings</div>
+  </div>
+  <div class="section" style="padding-top:20px">
+
+    <div class="settings-row">
+      <div class="settings-row-title">📊 Saved Spreadsheet</div>
+      <div class="settings-row-sub" id="settingsSheetInfo">No spreadsheet saved yet.</div>
+      <button class="settings-btn" id="settingsReplaceBtn">
+        <input type="file" id="settingsSheetInput" accept=".xlsx,.xls,.csv" />
+        ↑ Upload / Replace Spreadsheet
+      </button>
+      <button class="settings-btn danger" onclick="clearSpreadsheet()">✕ Remove Saved Spreadsheet</button>
+    </div>
+
+    <div class="settings-row">
+      <div class="settings-row-title">📈 Price History</div>
+      <div class="settings-row-sub" id="settingsHistInfo">No history recorded yet.</div>
+      <button class="settings-btn danger" onclick="clearHistory()">✕ Clear All History</button>
+    </div>
+
+    <div class="settings-row">
+      <div class="settings-row-title">ℹ️ How to use</div>
+      <div class="settings-row-sub">
+        1. Upload your ingredient spreadsheet once — it's saved on this device.<br><br>
+        2. Go to Scan, photograph vendor invoices.<br><br>
+        3. AI extracts prices and matches them to your ingredients.<br><br>
+        4. Review matches, then download the updated spreadsheet.<br><br>
+        5. Price history is saved automatically each time you download.
+      </div>
+    </div>
+
+    <div class="settings-row">
+      <div class="settings-row-title">💾 Add to Home Screen</div>
+      <div class="settings-row-sub">
+        On iPhone: tap the Share button in Safari, then "Add to Home Screen".<br><br>
+        On Android: tap the menu (⋮) in Chrome, then "Add to Home Screen".
+      </div>
+    </div>
+
+  </div>
+  <div style="height:20px"></div>
+</div>
+
+<!-- TAB BAR -->
+<div class="tab-bar">
+  <button class="tab active" id="tabScan" onclick="showPage('Scan')">
+    <span class="tab-icon">🧾</span>Scan
+  </button>
+  <button class="tab" id="tabHistory" onclick="showPage('History')">
+    <span class="tab-icon">📈</span>History
+  </button>
+  <button class="tab" id="tabSettings" onclick="showPage('Settings')">
+    <span class="tab-icon">⚙️</span>Settings
+  </button>
+</div>
+
+<!-- DOWNLOAD STICKY -->
+<div class="dl-sticky" id="dlSticky">
+  <div class="dl-sticky-inner" onclick="doDownload()">
+    <div class="dl-text">
+      <div class="dl-title" id="dlTitle">Download Updated Spreadsheet</div>
+      <div class="dl-sub" id="dlSub">Tap to apply all approved changes</div>
+    </div>
+    <div class="dl-arrow">↓</div>
+  </div>
+</div>
+
+<script>
+// ══════════ STATE ══════════
+const DB_KEY_SHEET   = 'invoiceAI_sheet_v1';
+const DB_KEY_COLS    = 'invoiceAI_cols_v1';
+const DB_KEY_HISTORY = 'invoiceAI_hist_v1';
+
+let workbook     = null;   // in-memory XLSX workbook
+let sheetData    = [];
+let sheetName    = '';
+let savedSheetName = ''; // filename
+
+let invoiceQueue = [];
+let allMatches   = [];
+let priceHistory = [];
+
+// ══════════ INIT ══════════
+(function init() {
+  loadHistoryFromStorage();
+  loadSheetFromStorage();
+  updateHistBadge();
+  updateSettingsInfo();
+})();
+
+// ══════════ NAVIGATION ══════════
+function showPage(name) {
+  ['Scan','History','Settings'].forEach(n => {
+    document.getElementById('page'+n).classList.toggle('active', n === name);
+    document.getElementById('tab'+n).classList.toggle('active', n === name);
+  });
+  if (name === 'History') { renderIngList(); }
+  if (name === 'Settings') { updateSettingsInfo(); }
+}
+
+// ══════════ SPREADSHEET PERSISTENCE ══════════
+function loadSheetFromStorage() {
+  try {
+    const raw = localStorage.getItem(DB_KEY_SHEET);
+    if (!raw) return;
+    const { name, data } = JSON.parse(raw);
+    const cols = JSON.parse(localStorage.getItem(DB_KEY_COLS) || '{"sheet":"","nameCol":"A","priceCol":"B"}');
+    savedSheetName = name;
+    const arr = base64ToUint8Array(data);
+    workbook = XLSX.read(arr, { type: 'array' });
+    populateSheetSelectors();
+    // restore col prefs
+    if (cols.sheet && workbook.SheetNames.includes(cols.sheet)) {
+      document.getElementById('sheetSelectorSaved').value = cols.sheet;
+    }
+    document.getElementById('nameColSaved').value = cols.nameCol || 'A';
+    document.getElementById('priceColSaved').value = cols.priceCol || 'B';
+    loadSheetData();
+    showSavedSheet(name);
+  } catch(e) { console.warn('Could not restore sheet:', e); }
+}
+
+function saveSheetToStorage(name, arrayBuffer) {
+  try {
+    const b64 = uint8ArrayToBase64(new Uint8Array(arrayBuffer));
+    localStorage.setItem(DB_KEY_SHEET, JSON.stringify({ name, data: b64 }));
+    saveColPrefs();
+  } catch(e) {
+    showToast('⚠️ Storage full — spreadsheet not saved permanently'); 
+  }
+}
+
+function saveColPrefs() {
+  const cols = {
+    sheet: document.getElementById('sheetSelectorSaved').value,
+    nameCol: document.getElementById('nameColSaved').value,
+    priceCol: document.getElementById('priceColSaved').value,
+  };
+  localStorage.setItem(DB_KEY_COLS, JSON.stringify(cols));
+}
+
+function showSavedSheet(name) {
+  document.getElementById('sheetSavedName').textContent = name;
+  document.getElementById('sheetSavedCard').style.display = 'block';
+  document.getElementById('sheetUploadCard').style.display = 'none';
+  checkReady();
+}
+
+function populateSheetSelectors() {
+  const sel = document.getElementById('sheetSelectorSaved');
+  sel.innerHTML = workbook.SheetNames.map(n => `<option>${n}</option>`).join('');
+}
+
+function loadSheetData() {
+  if (!workbook) return;
+  sheetName = document.getElementById('sheetSelectorSaved').value;
+  const ws = workbook.Sheets[sheetName];
+  sheetData = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+}
+
+function getIngredients() {
+  const ni = colIdx(document.getElementById('nameColSaved').value.trim().toUpperCase());
+  const pi = colIdx(document.getElementById('priceColSaved').value.trim().toUpperCase());
+  return sheetData.reduce((acc, row, i) => {
+    const name = String(row[ni] || '').trim();
+    if (name) acc.push({ row: i, name, price: row[pi] });
+    return acc;
+  }, []);
+}
+
+// Clear spreadsheet
+function clearSpreadsheet() {
+  if (!confirm('Remove saved spreadsheet from this device?')) return;
+  localStorage.removeItem(DB_KEY_SHEET);
+  localStorage.removeItem(DB_KEY_COLS);
+  workbook = null; sheetData = [];
+  document.getElementById('sheetSavedCard').style.display = 'none';
+  document.getElementById('sheetUploadCard').style.display = 'block';
+  checkReady();
+  updateSettingsInfo();
+  showToast('Spreadsheet removed');
+}
+
+// ══════════ SHEET FILE HANDLERS ══════════
+function handleSheetFile(file) {
+  if (!file) return;
+  savedSheetName = file.name;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const buf = ev.target.result;
+    workbook = XLSX.read(buf, { type: 'array' });
+    populateSheetSelectors();
+    loadSheetData();
+    saveSheetToStorage(file.name, buf);
+    showSavedSheet(file.name);
+    updateSettingsInfo();
+    showToast('✓ Spreadsheet saved to device');
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+document.getElementById('sheetFile').addEventListener('change', e => handleSheetFile(e.target.files[0]));
+document.getElementById('sheetReplaceInput').addEventListener('change', e => handleSheetFile(e.target.files[0]));
+document.getElementById('settingsSheetInput').addEventListener('change', e => handleSheetFile(e.target.files[0]));
+document.getElementById('sheetSelectorSaved').addEventListener('change', () => { loadSheetData(); saveColPrefs(); });
+document.getElementById('nameColSaved').addEventListener('change', saveColPrefs);
+document.getElementById('priceColSaved').addEventListener('change', saveColPrefs);
+
+// Drag drop for sheet
+const sheetDrop = document.getElementById('sheetDrop');
+sheetDrop.addEventListener('dragover', e => { e.preventDefault(); sheetDrop.classList.add('drag-over'); });
+sheetDrop.addEventListener('dragleave', () => sheetDrop.classList.remove('drag-over'));
+sheetDrop.addEventListener('drop', e => {
+  e.preventDefault(); sheetDrop.classList.remove('drag-over');
+  const f = Array.from(e.dataTransfer.files).find(f => /\.(xlsx|xls|csv)$/i.test(f.name));
+  if (f) handleSheetFile(f);
+});
+
+// ══════════ INVOICE FILES ══════════
+document.getElementById('invoiceCapture').addEventListener('change', e => addFiles(Array.from(e.target.files)));
+document.getElementById('invoiceFiles').addEventListener('change', e => addFiles(Array.from(e.target.files)));
+
+const invDrop = document.getElementById('invoiceDrop');
+invDrop.addEventListener('dragover', e => { e.preventDefault(); invDrop.classList.add('drag-over'); });
+invDrop.addEventListener('dragleave', () => invDrop.classList.remove('drag-over'));
+invDrop.addEventListener('drop', e => {
+  e.preventDefault(); invDrop.classList.remove('drag-over');
+  addFiles(Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/')));
+});
+
+function addFiles(files) {
+  files.forEach(file => {
+    const id = Date.now() + Math.random();
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const dataUrl = ev.target.result;
+      invoiceQueue.push({
+        id, name: file.name,
+        base64: dataUrl.split(',')[1],
+        mediaType: file.type || 'image/jpeg',
+        thumbUrl: dataUrl,
+        status: 'queued', items: [], matches: [], error: ''
+      });
+      renderQueue(); checkReady();
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function removeInv(id) {
+  invoiceQueue = invoiceQueue.filter(q => q.id != id);
+  renderQueue(); checkReady();
+}
+
+function renderQueue() {
+  const statusMap = { queued:'⏳ queued', processing:'⟳ processing…', done:'✓ done', error:'✗ error' };
+  document.getElementById('queueList').innerHTML = invoiceQueue.map(inv => `
+    <div class="qi ${inv.status}">
+      <div class="qi-thumb"><img src="${inv.thumbUrl}" /></div>
+      <div class="qi-body">
+        <div class="qi-name">${inv.name}</div>
+        <div class="qi-status">${statusMap[inv.status]}</div>
+      </div>
+      <button class="qi-del" onclick="removeInv('${inv.id}')">✕</button>
+    </div>`).join('');
+}
+
+function checkReady() {
+  document.getElementById('analyzeBtn').disabled = !(invoiceQueue.length > 0 && workbook);
+}
+
+// ══════════ ANALYZE ══════════
+document.getElementById('analyzeBtn').addEventListener('click', async () => {
+  loadSheetData();
+  const ingredients = getIngredients();
+  if (!ingredients.length) { setStatus('No ingredients found. Check column settings.', 'error'); return; }
+
+  document.getElementById('analyzeBtn').disabled = true;
+  document.getElementById('statusWrap').style.display = 'block';
+  document.getElementById('invoiceResults').innerHTML = '';
+  document.getElementById('resultsLabel').style.display = 'flex';
+  allMatches = [];
+
+  const queued = invoiceQueue.filter(inv => inv.status === 'queued' || inv.status === 'error');
+  if (!queued.length) { setStatus('No queued invoices.', 'ok'); document.getElementById('analyzeBtn').disabled = false; return; }
+
+  for (let i = 0; i < queued.length; i++) {
+    const inv = queued[i];
+    setStatus(`[${i+1}/${queued.length}] Reading ${inv.name}…`, 'loading');
+    inv.status = 'processing'; renderQueue();
+    try {
+      inv.items   = await extractItems(inv);
+      setStatus(`[${i+1}/${queued.length}] Matching ${inv.items.length} items…`, 'loading');
+      inv.matches = await matchItems(inv.items, ingredients);
+      inv.status  = 'done';
+      allMatches.push(...inv.matches.map(m => ({ ...m, invoiceId: inv.id, invoiceName: inv.name })));
+    } catch(err) {
+      inv.status = 'error'; inv.error = err.message;
+    }
+    renderQueue();
+    renderBlock(inv);
+  }
+
+  const approved = countApproved();
+  setStatus(`✓ Done — ${approved} matches ready to apply.`, 'ok');
+  updateDlSticky();
+  document.getElementById('analyzeBtn').disabled = false;
+});
+
+// ══════════ CLAUDE API ══════════
+async function callClaude(messages) {
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 1500, messages })
+  });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error.message);
+  return data.content.map(b => b.text || '').join('').trim();
+}
+
+function parseJSONArr(text) {
+  const clean = text.replace(/```json|```/g, '').trim();
+  const s = clean.indexOf('['), e = clean.lastIndexOf(']');
+  if (s < 0 || e < 0) throw new Error('No JSON array in response');
+  return JSON.parse(clean.slice(s, e+1));
+}
+
+async function extractItems(inv) {
+  const text = await callClaude([{ role:'user', content:[
+    { type:'image', source:{ type:'base64', media_type:inv.mediaType, data:inv.base64 } },
+    { type:'text', text:`Extract all line items from this vendor invoice. Return ONLY a JSON array.
+Each: {"name":"item name","unit_price":1.49,"unit":"lb/kg/case/each or empty","vendor":"supplier name if visible or empty"}
+Divide line total by quantity for unit_price if needed. Return ONLY the JSON array.` }
+  ]}]);
+  return parseJSONArr(text);
+}
+
+async function matchItems(items, ingredients) {
+  const text = await callClaude([{ role:'user', content:
+    `Match invoice items to spreadsheet ingredients. Return ONLY a JSON array.
+INVOICE: ${items.map((it,i)=>`${i}:"${it.name}" $${it.unit_price}`).join(' | ')}
+SHEET: ${ingredients.map(g=>`row${g.row}:"${g.name}" $${g.price}`).join(' | ')}
+Match by name (abbreviations/brands/spellings OK). Each invoice item → at most one row.
+Return: [{"invoiceIndex":0,"sheetRow":5,"confidence":"high"}] — sheetRow:-1 if no match.
+Return ONLY the JSON array.`
+  }]);
+  const raw = parseJSONArr(text);
+  return items.map((item, i) => {
+    const m = raw.find(r => r.invoiceIndex === i);
+    const sheetIng = (m && m.sheetRow >= 0) ? ingredients.find(g => g.row === m.sheetRow) : null;
+    return { invoiceItem: item, sheetIngredient: sheetIng, confidence: m ? m.confidence : 'none', sheetRow: sheetIng ? sheetIng.row : -1, approved: !!sheetIng };
+  });
+}
+
+// ══════════ RENDER RESULTS ══════════
+function renderBlock(inv) {
+  const container = document.getElementById('invoiceResults');
+  let el = document.getElementById('block_' + inv.id);
+  if (!el) { el = document.createElement('div'); el.id = 'block_' + inv.id; container.appendChild(el); }
+
+  if (inv.status === 'error') {
+    el.innerHTML = `<div class="inv-block"><div class="inv-block-hdr">
+      <span class="ibh-icon">❌</span>
+      <div class="ibh-info"><div class="ibh-name">${inv.name}</div><div class="ibh-meta" style="color:var(--red)">${inv.error}</div></div>
+    </div></div>`;
+    return;
+  }
+
+  const matched = inv.matches.filter(m => m.sheetIngredient).length;
+  const vendor = inv.items[0]?.vendor ? ` · ${inv.items[0].vendor}` : '';
+  el.innerHTML = `
+    <div class="inv-block" id="ib_${inv.id}">
+      <div class="inv-block-hdr" onclick="document.getElementById('ib_${inv.id}').classList.toggle('collapsed')">
+        <span class="ibh-icon">🧾</span>
+        <div class="ibh-info">
+          <div class="ibh-name">${inv.name}${vendor}</div>
+          <div class="ibh-meta">${inv.items.length} items · ${matched} matched</div>
+        </div>
+        <div class="ibh-right">
+          <span class="pill p-lime">${matched} ✓</span>
+          ${inv.items.length - matched > 0 ? `<span class="pill p-red">${inv.items.length - matched} skip</span>` : ''}
+        </div>
+        <span class="ibh-chevron">▾</span>
+      </div>
+      <div class="inv-block-body">
+        ${inv.matches.map((m, mi) => buildRow(m, mi, inv.id)).join('')}
+      </div>
+    </div>`;
+
+  el.querySelectorAll('input[type=checkbox]').forEach(cb => {
+    cb.addEventListener('change', e => {
+      const [iid, idx] = e.target.dataset.key.split('_');
+      const qi = invoiceQueue.find(q => q.id == iid);
+      if (qi) qi.matches[+idx].approved = e.target.checked;
+      updateDlSticky();
+    });
+  });
+}
+
+function buildRow(m, mi, invId) {
+  const it = m.invoiceItem, ing = m.sheetIngredient;
+  const cMap = { high:'b-hi', medium:'b-md', low:'b-md', none:'b-no' };
+  const cLbl = { high:'✓ auto', medium:'~ fuzzy', low:'~ low', none:'✗ none' };
+
+  let priceHtml = '<span class="price-eq">—</span>';
+  if (ing) {
+    const old = parseFloat(String(ing.price).replace(/[^0-9.]/g,''));
+    const nw = it.unit_price;
+    if (isNaN(old)) priceHtml = `<div class="price-nw">$${nw.toFixed(2)}</div><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted2)">new</div>`;
+    else if (nw > old) priceHtml = `<div class="price-up">$${nw.toFixed(2)}</div><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted2)">▲${((nw-old)/old*100).toFixed(1)}%</div>`;
+    else if (nw < old) priceHtml = `<div class="price-dn">$${nw.toFixed(2)}</div><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted2)">▼${((old-nw)/old*100).toFixed(1)}%</div>`;
+    else priceHtml = `<div class="price-eq">$${nw.toFixed(2)}</div><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted2)">no change</div>`;
+  }
+
+  return `
+    <div class="match-row">
+      <div class="mr-check">
+        <input type="checkbox" data-key="${invId}_${mi}" ${ing && m.approved ? 'checked' : ''} ${!ing ? 'disabled' : ''} />
+      </div>
+      <div class="mr-body">
+        <div class="mr-inv-name">${it.name}</div>
+        <div class="mr-inv-price">$${it.unit_price.toFixed(2)}${it.unit ? ' / '+it.unit : ''}</div>
+        ${ing ? `<div class="mr-match-name">→ ${ing.name} <span class="badge ${cMap[m.confidence]}">${cLbl[m.confidence]}</span></div>`
+               : `<div class="mr-match-name"><span class="no-match-label">no match found</span> <span class="badge b-no">✗</span></div>`}
+      </div>
+      <div class="mr-right">
+        <div class="mr-price-change">${priceHtml}</div>
+      </div>
+    </div>`;
+}
+
+// ══════════ STATUS ══════════
+function setStatus(msg, type='') {
+  const p = document.getElementById('statusPill');
+  p.className = 'status-pill ' + type;
+  p.innerHTML = type === 'loading' ? `<div class="spin"></div>${msg}` : msg;
+}
+
+function countApproved() {
+  let n = 0;
+  invoiceQueue.forEach(inv => inv.matches.forEach(m => { if (m.approved && m.sheetIngredient) n++; }));
+  return n;
+}
+
+function updateDlSticky() {
+  const n = countApproved();
+  document.getElementById('dlSticky').classList.toggle('visible', n > 0);
+  document.getElementById('dlTitle').textContent = `Apply ${n} Price Update${n!==1?'s':''}`;
+  document.getElementById('dlSub').textContent = 'Download updated spreadsheet';
+}
+
+// ══════════ DOWNLOAD ══════════
+function doDownload() {
+  if (!workbook) return;
+  loadSheetData();
+  const ws = workbook.Sheets[sheetName];
+  const priceCol = document.getElementById('priceColSaved').value.trim().toUpperCase();
+  const now = new Date();
+  let count = 0;
+  const newHist = [];
+
+  invoiceQueue.forEach(inv => {
+    inv.matches.forEach(m => {
+      if (!m.approved || !m.sheetIngredient) return;
+      const addr = priceCol + (m.sheetRow + 1);
+      const old = parseFloat(String(m.sheetIngredient.price).replace(/[^0-9.]/g,'')) || null;
+      const nw = m.invoiceItem.unit_price;
+      if (ws[addr]) { ws[addr].v = nw; ws[addr].w = String(nw); }
+      else ws[addr] = { v: nw, t: 'n' };
+      count++;
+      newHist.push({ date: now.toISOString(), ingredient: m.sheetIngredient.name, oldPrice: old, newPrice: nw, vendor: m.invoiceItem.vendor||'', invoiceName: inv.name });
+    });
+  });
+
+  XLSX.writeFile(workbook, 'updated_costs.xlsx');
+
+  // Save updated workbook back to storage so next time it's current
+  const wbOut = XLSX.write(workbook, { bookType:'xlsx', type:'array' });
+  saveSheetToStorage(savedSheetName, wbOut);
+
+  priceHistory = [...priceHistory, ...newHist];
+  saveHistory();
+  updateHistBadge();
+  showToast(`✓ ${count} prices updated & saved`);
+  document.getElementById('dlSticky').classList.remove('visible');
+}
+
+// ══════════ HISTORY ══════════
+function loadHistoryFromStorage() {
+  priceHistory = JSON.parse(localStorage.getItem(DB_KEY_HISTORY) || '[]');
+}
+function saveHistory() {
+  localStorage.setItem(DB_KEY_HISTORY, JSON.stringify(priceHistory));
+}
+function clearHistory() {
+  if (!confirm('Clear all price history?')) return;
+  priceHistory = [];
+  saveHistory();
+  updateHistBadge();
+  updateSettingsInfo();
+  renderIngList();
+  document.getElementById('ingDetailSection').style.display = 'none';
+  showToast('History cleared');
+}
+function updateHistBadge() {
+  const b = document.getElementById('histBadge');
+  b.style.display = priceHistory.length ? 'flex' : 'none';
+  b.textContent = priceHistory.length + (priceHistory.length===1?' event':' events');
+}
+
+function renderIngList() {
+  const search = document.getElementById('ingSearch').value.toLowerCase();
+  const map = {};
+  priceHistory.forEach(e => {
+    if (!map[e.ingredient]) map[e.ingredient] = { name: e.ingredient, latest: e.newPrice, count: 0, first: e.newPrice };
+    map[e.ingredient].latest = e.newPrice;
+    map[e.ingredient].count++;
+  });
+  const ings = Object.values(map).filter(i => i.name.toLowerCase().includes(search)).sort((a,b) => a.name.localeCompare(b.name));
+  const el = document.getElementById('ingListEl');
+  if (!ings.length) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-icon">📈</div><div class="empty-text">${priceHistory.length ? 'No results' : 'No history yet.\nProcess invoices and download\nto start tracking prices.'}</div></div>`;
+    return;
+  }
+  el.innerHTML = ings.map(i => `
+    <div class="ing-item" onclick="showIngDetail('${escStr(i.name)}',this)">
+      <div>
+        <div class="ing-item-name">${i.name}</div>
+        <div class="ing-item-sub">${i.count} update${i.count!==1?'s':''}</div>
+      </div>
+      <div class="ing-item-price">$${i.latest.toFixed(2)}</div>
+    </div>`).join('');
+}
+
+function showIngDetail(name, el) {
+  document.querySelectorAll('.ing-item').forEach(i => i.classList.remove('active'));
+  if (el) el.classList.add('active');
+
+  const events = priceHistory.filter(e => e.ingredient === name).sort((a,b) => new Date(a.date)-new Date(b.date));
+  if (!events.length) return;
+
+  document.getElementById('ingDetailSection').style.display = 'block';
+  document.getElementById('ingDetailLabel').textContent = name;
+
+  const prices = events.map(e => e.newPrice);
+  const minP = Math.min(...prices) * .92, maxP = Math.max(...prices) * 1.08;
+  const W = 340, H = 120, P = 14;
+  const xS = i => events.length < 2 ? W/2 : P + (i/(events.length-1))*(W-P*2);
+  const yS = p => H - P - ((p-minP)/(maxP-minP||1))*(H-P*2);
+  const pts = events.map((e,i) => `${xS(i)},${yS(e.newPrice)}`).join(' ');
+  const area = `${xS(0)},${H} ${pts} ${xS(events.length-1)},${H}`;
+
+  const first = events[0].oldPrice ?? events[0].newPrice;
+  const last  = events[events.length-1].newPrice;
+  const chgPct = first ? ((last-first)/first*100) : 0;
+  const col = chgPct > 0 ? 'var(--red)' : chgPct < 0 ? 'var(--lime)' : 'var(--muted2)';
+
+  document.getElementById('ingDetail').innerHTML = `
+    <div class="chart-card">
+      <div class="chart-name">${name}</div>
+      <div class="chart-meta">${events.length} update${events.length!==1?'s':''} recorded</div>
+      <div class="chart-stats">
+        <div class="chart-stat">
+          <div class="chart-stat-val" style="color:var(--lime)">$${last.toFixed(2)}</div>
+          <div class="chart-stat-lbl">Current</div>
+        </div>
+        <div class="chart-stat">
+          <div class="chart-stat-val" style="color:${col}">${chgPct>0?'▲':chgPct<0?'▼':''}${Math.abs(chgPct).toFixed(1)}%</div>
+          <div class="chart-stat-lbl">Change</div>
+        </div>
+        <div class="chart-stat">
+          <div class="chart-stat-val">$${first.toFixed(2)}</div>
+          <div class="chart-stat-lbl">First</div>
+        </div>
+      </div>
+      <svg class="chart-svg" viewBox="0 0 ${W} ${H}">
+        <defs>
+          <linearGradient id="cg" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="${col}" stop-opacity=".2"/>
+            <stop offset="100%" stop-color="${col}" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+        <polygon points="${area}" fill="url(#cg)"/>
+        <polyline points="${pts}" fill="none" stroke="${col}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+        ${events.map((e,i) => `
+          <circle cx="${xS(i)}" cy="${yS(e.newPrice)}" r="5" fill="${col}" stroke="var(--card)" stroke-width="2"/>
+          <text x="${xS(i)}" y="${yS(e.newPrice)-10}" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="8" fill="var(--muted2)">$${e.newPrice.toFixed(2)}</text>
+        `).join('')}
+      </svg>
+    </div>
+
+    ${[...events].reverse().map(e => {
+      const c = e.oldPrice != null ? ((e.newPrice-e.oldPrice)/e.oldPrice*100).toFixed(1) : null;
+      const cc = c > 0 ? 'var(--red)' : c < 0 ? 'var(--lime)' : 'var(--muted2)';
+      return `<div class="hist-row">
+        <div class="hist-row-top">
+          <span class="hist-date">${fmtDate(e.date)}</span>
+          ${c !== null ? `<span class="hist-chg" style="color:${cc}">${+c>0?'▲':+c<0?'▼':''}${Math.abs(c)}%</span>` : ''}
+        </div>
+        <div class="hist-row-bot">
+          ${e.oldPrice != null ? `<span class="hist-price" style="color:var(--muted2)">$${e.oldPrice.toFixed(2)}</span><span style="color:var(--muted2)">→</span>` : ''}
+          <span class="hist-price" style="font-weight:700;color:var(--lime)">$${e.newPrice.toFixed(2)}</span>
+          ${e.vendor ? `<span class="hist-vendor">· ${e.vendor}</span>` : ''}
+          ${e.invoiceName ? `<span class="hist-vendor">· ${e.invoiceName}</span>` : ''}
+        </div>
+      </div>`;
+    }).join('')}
+
+    <div style="height:8px"></div>`;
+
+  // Scroll to detail
+  setTimeout(() => document.getElementById('ingDetailSection').scrollIntoView({ behavior:'smooth', block:'start' }), 50);
+}
+
+// ══════════ SETTINGS INFO ══════════
+function updateSettingsInfo() {
+  document.getElementById('settingsSheetInfo').textContent = savedSheetName
+    ? `"${savedSheetName}" is saved on this device.`
+    : 'No spreadsheet saved yet.';
+  document.getElementById('settingsHistInfo').textContent = priceHistory.length
+    ? `${priceHistory.length} price event${priceHistory.length!==1?'s':''} recorded across ${new Set(priceHistory.map(e=>e.ingredient)).size} ingredients.`
+    : 'No history recorded yet.';
+}
+
+// ══════════ TOAST ══════════
+let toastTimer;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+// ══════════ HELPERS ══════════
+function colIdx(letter) { let i=0; for(const c of letter) i=i*26+(c.charCodeAt(0)-64); return i-1; }
+function fmtDate(d) { return new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); }
+function escStr(s) { return s.replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;'); }
+
+function uint8ArrayToBase64(u8) {
+  let b=''; const c=65536;
+  for(let i=0;i<u8.length;i+=c) b+=String.fromCharCode(...u8.subarray(i,i+c));
+  return btoa(b);
+}
+function base64ToUint8Array(b64) {
+  const s=atob(b64); const u=new Uint8Array(s.length);
+  for(let i=0;i<s.length;i++) u[i]=s.charCodeAt(i); return u;
+}
+</script>
+</body>
+</html>
