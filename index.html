@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0f0f0f">
+<title>Invoice AI</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#0f0f0f;--s1:#171717;--s2:#1f1f1f;--s3:#272727;--s4:#303030;
+  --b1:#242424;--b2:#343434;
+  --lime:#c8f135;--limd:rgba(200,241,53,.1);--limm:rgba(200,241,53,.22);
+  --red:#ff5050;--redd:rgba(255,80,80,.1);
+  --grn:#3ddc84;--grnd:rgba(61,220,132,.1);
+  --amb:#ffb700;--ambd:rgba(255,183,0,.1);
+  --blu:#4da8ff;--blud:rgba(77,168,255,.1);
+  --pur:#b07aff;--purd:rgba(176,122,255,.1);
+  --tx:#f0ece0;--t2:#767676;--t3:#404040;
+  --r:12px;--sb:env(safe-area-inset-bottom,0px);--st:env(safe-area-inset-top,0px);
+}
+html,body{min-height:100%;background:var(--bg);color:var(--tx);font-family:'Syne',sans-serif;overflow-x:hidden}
+
+/* PIN */
+#pin{position:fixed;inset:0;background:var(--bg);z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 24px}
+.pin-logo{font-size:40px;font-weight:800;letter-spacing:-1px;margin-bottom:3px;line-height:1}
+.pin-logo em{color:var(--lime);font-style:normal}
+.pin-sub{font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:3px;color:var(--t3);text-transform:uppercase;margin-bottom:48px}
+.pin-dots{display:flex;gap:14px;margin-bottom:34px}
+.dot{width:13px;height:13px;border-radius:50%;border:2px solid var(--b2);transition:.15s}
+.dot.on{background:var(--lime);border-color:var(--lime);box-shadow:0 0 10px rgba(200,241,53,.35)}
+.pad{display:grid;grid-template-columns:repeat(3,70px);gap:10px}
+.k{width:70px;height:70px;border-radius:50%;border:1px solid var(--b2);background:var(--s1);color:var(--tx);font-family:'Syne',sans-serif;font-size:21px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.1s}
+.k:active{background:var(--s3);transform:scale(.93)}
+.k.del{font-size:15px;color:var(--t2)}.k.emp{visibility:hidden}
+.pin-msg{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--t3);margin-top:18px;height:14px;text-align:center;transition:.2s}
+.pin-msg.err{color:var(--red);animation:shk .3s}
+@keyframes shk{0%,100%{transform:translateX(0)}30%{transform:translateX(-7px)}70%{transform:translateX(7px)}}
+
+/* APP */
+#app{display:none;min-height:100vh}
+#app.on{display:block}
+.hd{position:sticky;top:0;z-index:50;background:rgba(15,15,15,.96);backdrop-filter:blur(20px);border-bottom:1px solid var(--b1);padding:calc(var(--st)+13px) 17px 13px;display:flex;align-items:center;gap:10px}
+.hd-logo{font-size:19px;font-weight:800;letter-spacing:-.3px}
+.hd-logo em{color:var(--lime);font-style:normal}
+.hd-tag{font-family:'IBM Plex Mono',monospace;font-size:9px;padding:3px 9px;border-radius:20px;background:var(--limd);border:1px solid var(--limm);color:var(--lime);letter-spacing:.5px}
+.hd-r{margin-left:auto;display:flex;align-items:center;gap:8px}
+.hd-who{font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--t2)}
+.hd-out{background:none;border:none;color:var(--t3);font-size:12px;cursor:pointer;font-family:'Syne',sans-serif;padding:4px 8px}
+
+.wrap{padding:18px 15px calc(60px + var(--sb))}
+
+/* CARDS / SHARED */
+.card{background:var(--s1);border:1px solid var(--b1);border-radius:var(--r);overflow:hidden;margin-bottom:10px}
+.cp{padding:14px 15px}
+.lbl{font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--lime);display:flex;align-items:center;gap:5px;margin-bottom:11px}
+.lbl::before{content:'';width:4px;height:4px;background:var(--lime);border-radius:50%;flex-shrink:0}
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:15px;border-radius:10px;border:none;cursor:pointer;font-family:'Syne',sans-serif;font-size:14px;font-weight:700;transition:.1s;letter-spacing:.2px;-webkit-appearance:none}
+.btn:active:not(:disabled){filter:brightness(.88);transform:scale(.98)}
+.btn:disabled{opacity:.28;cursor:not-allowed}
+.btn-lime{background:var(--lime);color:#111}
+.btn-out{background:var(--s2);border:1px solid var(--b2);color:var(--tx)}
+.btn-sm{padding:7px 13px;width:auto;font-size:11px;border-radius:8px}
+.btn-grn{background:var(--grnd);border:1px solid rgba(61,220,132,.2);color:var(--grn)}
+.btn-red{background:var(--redd);border:1px solid rgba(255,80,80,.2);color:var(--red)}
+.field{margin-bottom:11px}
+.field label{display:block;font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--t2);margin-bottom:5px}
+.field select,.field input{width:100%;background:var(--s2);border:1px solid var(--b2);color:var(--tx);padding:11px 13px;border-radius:9px;font-family:'Syne',sans-serif;font-size:13px;-webkit-appearance:none;transition:.15s}
+.field select:focus,.field input:focus{outline:none;border-color:var(--lime)}
+.st{display:flex;align-items:center;gap:8px;padding:10px 13px;border-radius:9px;font-family:'IBM Plex Mono',monospace;font-size:11px;margin-bottom:10px;border:1px solid transparent}
+.st.ok{background:var(--grnd);border-color:rgba(61,220,132,.2);color:var(--grn)}
+.st.err{background:var(--redd);border-color:rgba(255,80,80,.2);color:var(--red)}
+.st.load{background:var(--blud);border-color:rgba(77,168,255,.2);color:var(--blu)}
+.st.warn{background:var(--ambd);border-color:rgba(255,183,0,.2);color:var(--amb)}
+.spin{width:11px;height:11px;border:2px solid currentColor;border-top-color:transparent;border-radius:50%;animation:sp .6s linear infinite;flex-shrink:0}
+@keyframes sp{to{transform:rotate(360deg)}}
+.toast{position:fixed;top:calc(var(--st)+62px);left:50%;transform:translateX(-50%) translateY(-10px);background:var(--s3);border:1px solid var(--b2);border-radius:9px;padding:9px 16px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--tx);z-index:200;opacity:0;transition:.2s;white-space:nowrap;pointer-events:none;max-width:92vw}
+.toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+.pill{display:inline-flex;align-items:center;padding:3px 8px;border-radius:20px;font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.2px;font-weight:500}
+.p-lime{background:var(--limd);color:var(--lime)}
+.p-red{background:var(--redd);color:var(--red)}
+.p-grn{background:var(--grnd);color:var(--grn)}
+.p-amb{background:var(--ambd);color:var(--amb)}
+.p-blu{background:var(--blud);color:var(--blu)}
+.p-pur{background:var(--purd);color:var(--pur)}
+
+/* UPLOAD AREA */
+.cam-btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:17px;border-radius:10px;border:none;cursor:pointer;background:var(--lime);color:#111;font-family:'Syne',sans-serif;font-size:15px;font-weight:800;letter-spacing:.2px;position:relative;overflow:hidden;transition:.1s;margin-bottom:8px}
+.cam-btn:active{filter:brightness(.9);transform:scale(.98)}
+.cam-btn input{position:absolute;inset:0;opacity:0;cursor:pointer;font-size:16px}
+.drop{border:2px dashed var(--b2);border-radius:10px;padding:22px;text-align:center;cursor:pointer;position:relative;transition:.2s;margin-bottom:12px}
+.drop.over,.drop:hover{border-color:var(--lime);background:var(--limd)}
+.drop input{position:absolute;inset:0;opacity:0;cursor:pointer;font-size:16px}
+
+/* QUEUE */
+.qi{background:var(--s1);border:1px solid var(--b1);border-radius:10px;padding:11px 13px;display:flex;align-items:center;gap:10px;margin-bottom:7px;transition:.2s}
+.qi.processing{border-color:rgba(200,241,53,.2)}
+.qi.done{border-color:rgba(61,220,132,.2)}
+.qi.error{border-color:rgba(255,80,80,.2)}
+.qi-th{width:40px;height:40px;border-radius:7px;overflow:hidden;background:var(--s2);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:15px}
+.qi-th img{width:100%;height:100%;object-fit:cover}
+.qi-info{flex:1;min-width:0}
+.qi-name{font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.qi-st{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--t2);margin-top:2px}
+.qi-del{background:none;border:none;color:var(--t3);font-size:16px;cursor:pointer;padding:4px;flex-shrink:0}
+.qi-del:active{color:var(--red)}
+
+/* RESULT BLOCKS */
+.rb{background:var(--s1);border:1px solid var(--b1);border-radius:var(--r);margin-bottom:10px;overflow:hidden}
+.rb-hdr{padding:12px 14px;display:flex;align-items:center;gap:9px;cursor:pointer}
+.rb-hdr:active{background:var(--s2)}
+.rb-info{flex:1;min-width:0}
+.rb-name{font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rb-meta{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--t2);margin-top:2px}
+.chev{color:var(--t3);font-size:12px;transition:.2s;flex-shrink:0}
+.rb.coll .chev{transform:rotate(-90deg)}
+.rb.coll .rb-body{display:none}
+.rb-body{border-top:1px solid var(--b1)}
+
+/* MATCH ROWS */
+.mr{padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.03);display:flex;align-items:flex-start;gap:9px}
+.mr:last-child{border-bottom:none}
+.mr-cb{flex-shrink:0;margin-top:2px}
+.mr-cb input{width:19px;height:19px;accent-color:var(--lime);cursor:pointer}
+.mr-body{flex:1;min-width:0}
+.mr-inv{font-size:13px;font-weight:700}
+.mr-inv-detail{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--t2);margin-top:2px;line-height:1.6}
+.mr-sheet{font-size:12px;color:var(--t2);margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,.04);line-height:1.5}
+/* unit mismatch warning */
+.unit-warn{background:var(--ambd);border:1px solid rgba(255,183,0,.2);border-radius:7px;padding:7px 10px;margin-top:6px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--amb);line-height:1.6}
+.unit-ok{background:var(--grnd);border:1px solid rgba(61,220,132,.15);border-radius:7px;padding:6px 10px;margin-top:5px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--grn)}
+.mr-price{display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0;min-width:70px}
+.p-up{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--red);font-weight:500}
+.p-dn{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--grn);font-weight:500}
+.p-eq{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--t2)}
+.p-nw{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--blu)}
+.p-pct{font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--t3)}
+.p-old{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--t3);text-decoration:line-through}
+
+/* UNIT OVERRIDE */
+.unit-override{display:flex;align-items:center;gap:6px;margin-top:6px}
+.unit-override select{background:var(--s2);border:1px solid var(--b2);color:var(--tx);padding:5px 8px;border-radius:7px;font-family:'IBM Plex Mono',monospace;font-size:10px;-webkit-appearance:none;cursor:pointer}
+.unit-override select:focus{outline:none;border-color:var(--lime)}
+.unit-override label{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--t2)}
+
+/* PENDING */
+.pcard{background:var(--s1);border:1px solid var(--b1);border-radius:var(--r);padding:14px 15px;margin-bottom:10px}
+.pcard-hdr{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px}
+.pcard-loc{font-size:16px;font-weight:800;letter-spacing:-.2px}
+.pcard-date{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--t2);margin-top:2px}
+.pcard-items{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--t2);line-height:2;margin-bottom:12px;white-space:pre-line}
+.pcard-acts{display:flex;gap:8px}
+.pa{flex:1;padding:10px;border-radius:8px;border:none;background:var(--grnd);color:var(--grn);font-family:'Syne',sans-serif;font-weight:700;font-size:12px;cursor:pointer;transition:.1s}
+.pa:active{filter:brightness(.9)}
+.pr{flex:1;padding:10px;border-radius:8px;border:none;background:var(--redd);color:var(--red);font-family:'Syne',sans-serif;font-weight:700;font-size:12px;cursor:pointer}
+
+/* STICKY */
+.sticky{position:fixed;bottom:0;left:0;right:0;padding:9px 14px calc(9px + var(--sb));background:rgba(15,15,15,.97);border-top:1px solid var(--b1);backdrop-filter:blur(20px);z-index:90;display:none}
+.sticky.on{display:block}
+.stick-in{display:flex;align-items:center;gap:12px;background:var(--lime);border-radius:10px;padding:13px 16px;cursor:pointer}
+.stick-in:active{filter:brightness(.9)}
+.stick-lbl{flex:1}
+.stick-t{font-size:14px;font-weight:800;color:#111;letter-spacing:-.2px}
+.stick-s{font-family:'IBM Plex Mono',monospace;font-size:10px;color:rgba(17,17,17,.5);margin-top:1px}
+
+/* TABS */
+.tabs{position:sticky;top:50px;z-index:40;background:rgba(15,15,15,.96);backdrop-filter:blur(20px);border-bottom:1px solid var(--b1);display:flex}
+.tb{flex:1;padding:12px 8px;border:none;background:none;color:var(--t2);font-family:'Syne',sans-serif;font-size:11px;font-weight:700;cursor:pointer;letter-spacing:.4px;text-transform:uppercase;border-bottom:2px solid transparent;transition:.15s;position:relative}
+.tb.on{color:var(--lime);border-bottom-color:var(--lime)}
+.tb-badge{display:none;position:absolute;top:6px;right:calc(50% - 22px);background:var(--red);color:#fff;font-size:8px;font-weight:700;padding:1px 5px;border-radius:10px;font-family:'IBM Plex Mono',monospace}
+.tb-badge.on{display:block}
+.page{display:none}
+.page.on{display:block}
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:160px;text-align:center;padding:28px}
+.empty-ic{font-size:38px;margin-bottom:10px;opacity:.2}
+.empty-t{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--t3);line-height:2}
+</style>
+</head>
+<body>
+<div class="toast" id="toast"></div>
+
+<!-- PIN -->
+<div id="pin">
+  <div class="pin-logo">invoice<em>AI</em></div>
+  <div class="pin-sub">Chef Daniel Elmaleh</div>
+  <div class="pin-dots" id="dots"><div class="dot" id="d0"></div><div class="dot" id="d1"></div><div class="dot" id="d2"></div><div class="dot" id="d3"></div></div>
+  <div class="pad">
+    <button class="k" onclick="kp('1')">1</button><button class="k" onclick="kp('2')">2</button><button class="k" onclick="kp('3')">3</button>
+    <button class="k" onclick="kp('4')">4</button><button class="k" onclick="kp('5')">5</button><button class="k" onclick="kp('6')">6</button>
+    <button class="k" onclick="kp('7')">7</button><button class="k" onclick="kp('8')">8</button><button class="k" onclick="kp('9')">9</button>
+    <button class="k emp"></button><button class="k" onclick="kp('0')">0</button><button class="k del" onclick="kd()">⌫</button>
+  </div>
+  <div class="pin-msg" id="pmsg">Enter your PIN</div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <div class="hd">
+    <div class="hd-logo">invoice<em>AI</em></div>
+    <div class="hd-tag" id="hdBadge">—</div>
+    <div class="hd-r">
+      <div class="hd-who" id="hdWho"></div>
+      <button class="hd-out" onclick="lo()">Sign out</button>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tb on" id="tbScan" onclick="showTab('Scan')">📷 Scan</button>
+    <button class="tb" id="tbPending" onclick="showTab('Pending')">🕐 Pending<span class="tb-badge" id="pbadge"></span></button>
+  </div>
+
+  <!-- SCAN -->
+  <div class="page on wrap" id="pageScan">
+
+    <!-- Step 1: Google -->
+    <div class="lbl">Step 1 — Google Sign In</div>
+    <div class="card cp" id="gCard">
+      <div style="font-size:13px;font-weight:700;margin-bottom:3px">Connect Google Sheets</div>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--t2);margin-bottom:12px">Required to read and update your spreadsheet</div>
+      <div id="g_btn"></div>
+    </div>
+    <div style="display:none;background:var(--grnd);border:1px solid rgba(61,220,132,.2);border-radius:var(--r);padding:12px 14px;margin-bottom:10px;align-items:center;gap:10px" id="gConnected">
+      <span style="font-size:18px">✅</span>
+      <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:700" id="gEmail"></div><div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--grn)">✓ Connected</div></div>
+      <button onclick="gSO()" style="background:var(--s2);border:1px solid var(--b2);color:var(--t2);font-size:10px;font-family:'Syne',sans-serif;font-weight:600;padding:5px 9px;border-radius:7px;cursor:pointer">Sign out</button>
+    </div>
+
+    <!-- Step 2: Sheet config -->
+    <div id="sheetStep">
+      <div class="lbl">Step 2 — Spreadsheet</div>
+      <div class="card cp" id="sheetConfigCard">
+        <div class="field"><label>Google Sheet URL or ID</label><input id="sheetUrl" placeholder="https://docs.google.com/spreadsheets/d/…"/></div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--t2);margin-bottom:10px;letter-spacing:.5px">TABS TO UPDATE (check all that apply)</div>
+        <div id="tabCheckboxes" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px"></div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--t2);margin-bottom:6px;letter-spacing:.5px">NAME COLUMN &nbsp; PRICE COLUMN &nbsp; UNIT COLUMN (optional)</div>
+        <div id="tabColConfigs" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px"></div>
+        <button class="btn btn-lime" onclick="connectSheet()">Load Sheet Data</button>
+      </div>
+      <div style="display:none;background:var(--limd);border:1px solid var(--limm);border-radius:var(--r);padding:12px 14px;margin-bottom:10px;align-items:center;gap:10px" id="sheetConnected">
+        <span style="font-size:18px">📊</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:700" id="sheetInfo">—</div>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--lime)" id="sheetIngCount">—</div>
+        </div>
+        <button onclick="resetSheet()" style="background:var(--s2);border:1px solid var(--b2);color:var(--t2);font-size:10px;font-family:'Syne',sans-serif;font-weight:600;padding:5px 9px;border-radius:7px;cursor:pointer">Change</button>
+      </div>
+    </div>
+
+    <!-- Step 3: Upload -->
+    <div id="uploadStep">
+      <div class="lbl">Step 3 — Invoice Photos</div>
+      <div id="statusEl" style="margin-bottom:6px"></div>
+      <button class="cam-btn"><input type="file" id="capIn" accept="image/*" capture="environment" multiple/>📷 Take Invoice Photo</button>
+      <div class="drop" id="dropZ">
+        <input type="file" id="fileIn" accept="image/*" multiple/>
+        <div style="font-size:22px;margin-bottom:5px">🖼️</div>
+        <div style="font-size:13px;font-weight:700;margin-bottom:2px">Choose from library</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--t2)">or drag & drop · multiple OK</div>
+      </div>
+      <div id="queueEl"></div>
+      <button class="btn btn-lime" id="analyzeBtn" disabled onclick="runAnalysis()">✦ Analyze Invoices</button>
+      <div id="resultsEl" style="margin-top:12px"></div>
+    </div>
+
+  </div>
+
+  <!-- PENDING -->
+  <div class="page wrap" id="pagePending">
+    <div class="lbl" style="margin-bottom:14px">
+      <span id="pendingLbl">Pending Approvals</span>
+    </div>
+    <div id="pendingEl"></div>
+  </div>
+
+</div><!-- app -->
+
+<div class="sticky" id="sticky">
+  <div class="stick-in" onclick="handleApply()">
+    <div class="stick-lbl">
+      <div class="stick-t" id="stickT">Apply Updates</div>
+      <div class="stick-s" id="stickS">Tap to push to Google Sheets</div>
+    </div>
+    <div style="font-size:20px;color:#111;font-weight:800">↑</div>
+  </div>
+</div>
+
+<script>
+// ─────────────────────────────────────────
+//  CONFIG
+// ─────────────────────────────────────────
+const GCI   = '40132105717-s8lsvvc68v8555fd3p7bag0e0aq1df7l.apps.googleusercontent.com';
+const SCOPE = 'https://www.googleapis.com/auth/spreadsheets';
+const PROXY = 'https://invoiceai-proxy.ryanhouserasi.workers.dev/';
+
+// Known unit groups for mismatch detection + conversion
+const UNIT_GROUPS = {
+  weight:  ['LB','LBS','OZ','KG','G','GRAM','GRAMS','POUND','POUNDS','OUNCE','OUNCES'],
+  volume:  ['GAL','GALLON','GALLONS','QT','QUART','QUARTS','FL OZ','FL_OZ','FLOZ','L','LITER','LITERS','ML'],
+  count:   ['EA','EACH','PC','PCS','PIECE','PIECES','CT','COUNT'],
+  case:    ['CS','CASE','CASES','BX','BOX','BOXES','BAG','BAGS','PKG','PACK','PACKS'],
+};
+// Conversion to oz for weight / fl oz for volume
+const TO_OZ = { LB:16,LBS:16,OZ:1,KG:35.274,G:0.03527,GRAM:0.03527,GRAMS:0.03527,POUND:16,POUNDS:16,OUNCE:1,OUNCES:1 };
+const TO_FLOZ = { GAL:128,GALLON:128,GALLONS:128,QT:32,QUART:32,QUARTS:32,'FL OZ':1,'FL_OZ':1,FLOZ:1,L:33.814,LITER:33.814,LITERS:33.814,ML:0.0338 };
+
+const PINS = {
+  '1111':{ name:'Miz La La — West Adams',   short:'West Adams',   role:'staff' },
+  '2222':{ name:'Miz La La — Sycamore',     short:'Sycamore',     role:'staff' },
+  '3333':{ name:'Miz La La — Sherman Oaks', short:'Sherman Oaks', role:'staff' },
+  '4444':{ name:'Johnnies Pastrami',         short:'Johnnies',     role:'staff' },
+  '5555':{ name:'Vickies All Day',           short:'Vickies',      role:'staff' },
+  '6666':{ name:'Catering',                  short:'Catering',     role:'staff' },
+  '8888':{ name:'Chef Danny',                short:'Chef Danny',   role:'admin' },
+  '9999':{ name:'Admin',                     short:'Admin',        role:'admin' },
+};
+
+// Saved config keys
+const K_SHEET  = 'iai_sheet_v2';
+const K_PEND   = 'iai_pending_v2';
+
+// Default tabs — user can change
+const DEFAULT_TABS = [
+  { name:'Ingredients',           nameCol:'A', priceCol:'D', unitCol:'C', active:true  },
+  { name:'PRODUCT PURCHASE COST', nameCol:'A', priceCol:'D', unitCol:'C', active:false },
+];
+
+// ─────────────────────────────────────────
+//  STATE
+// ─────────────────────────────────────────
+let user     = null;
+let pin      = '';
+let gToken   = null;
+let gTC      = null;
+let sheetId  = '';
+let tabCfg   = JSON.parse(JSON.stringify(DEFAULT_TABS));
+let ingData  = [];   // [{name, price, unit, sheetUnit, row, a1row, tab, priceCol}]
+let queue    = [];
+let pending  = JSON.parse(localStorage.getItem(K_PEND)||'[]');
+
+// ─────────────────────────────────────────
+//  PIN
+// ─────────────────────────────────────────
+function kp(d){ if(pin.length>=4)return; pin+=d; ud(); if(pin.length===4) setTimeout(cp,80); }
+function kd(){ pin=pin.slice(0,-1); ud(); msg('Enter your PIN',''); }
+function ud(){ for(let i=0;i<4;i++) document.getElementById('d'+i).classList.toggle('on',i<pin.length); }
+function msg(t,cls){ const e=document.getElementById('pmsg'); e.textContent=t; e.className='pin-msg'+(cls?' '+cls:''); }
+function cp(){
+  const u=PINS[pin];
+  if(u){ user={...u}; loginOK(); }
+  else{ msg('Incorrect PIN — try again','err'); setTimeout(()=>{ pin=''; ud(); msg('Enter your PIN',''); },600); }
+}
+function lo(){ user=null; pin=''; document.getElementById('app').classList.remove('on'); document.getElementById('pin').style.display='flex'; ud(); msg('Enter your PIN',''); queue=[]; renderQueue(); document.getElementById('resultsEl').innerHTML=''; clearSt(); document.getElementById('sticky').classList.remove('on'); }
+function loginOK(){
+  document.getElementById('pin').style.display='none';
+  document.getElementById('app').classList.add('on');
+  document.getElementById('hdBadge').textContent=user.short;
+  document.getElementById('hdWho').textContent=user.role==='admin'?'ADMIN':'STAFF';
+  initGoogle();
+  renderTabCheckboxes();
+  restoreSheetConfig();
+  renderPending();
+  updatePBadge();
+}
+
+// ─────────────────────────────────────────
+//  TABS
+// ─────────────────────────────────────────
+function showTab(t){
+  ['Scan','Pending'].forEach(n=>{
+    document.getElementById('page'+n).classList.toggle('on',n===t);
+    document.getElementById('tb'+n).classList.toggle('on',n===t);
+  });
+}
+
+// ─────────────────────────────────────────
+//  GOOGLE SIGN IN
+// ─────────────────────────────────────────
+function initGoogle(){
+  const wait=setInterval(()=>{
+    if(window.google&&google.accounts){ clearInterval(wait);
+      google.accounts.id.initialize({client_id:GCI,callback:onGSI,auto_select:false});
+      google.accounts.id.renderButton(document.getElementById('g_btn'),{theme:'filled_black',size:'large',width:'100%'});
+    }
+  },300);
+}
+function onGSI(resp){
+  const p=JSON.parse(atob(resp.credential.split('.')[1]));
+  document.getElementById('gEmail').textContent=p.email;
+  document.getElementById('gCard').style.display='none';
+  const gc=document.getElementById('gConnected'); gc.style.display='flex';
+  gTC=google.accounts.oauth2.initTokenClient({client_id:GCI,scope:SCOPE,callback:r=>{ if(!r.error){ gToken=r.access_token; if(sheetId) loadIngredients(); checkReady(); }}});
+  gTC.requestAccessToken({prompt:''});
+}
+function gSO(){ gToken=null; gTC=null; ingData=[]; document.getElementById('gCard').style.display='block'; document.getElementById('gConnected').style.display='none'; checkReady(); }
+function freshToken(cb){ if(!gTC){showToast('Sign in to Google first');return;} gTC.callback=r=>{if(!r.error){gToken=r.access_token;cb();}}; gTC.requestAccessToken({prompt:''}); }
+
+// ─────────────────────────────────────────
+//  SHEET CONFIG UI
+// ─────────────────────────────────────────
+function renderTabCheckboxes(){
+  const el=document.getElementById('tabCheckboxes');
+  el.innerHTML=tabCfg.map((t,i)=>`
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;background:var(--s2);border:1px solid var(--b2);border-radius:8px;padding:9px 11px">
+      <input type="checkbox" id="tc_${i}" ${t.active?'checked':''} onchange="tabCfg[${i}].active=this.checked;renderColConfigs()" style="width:16px;height:16px;accent-color:var(--lime);flex-shrink:0"/>
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px">${t.name}</span>
+    </label>`).join('');
+  // Allow adding custom tab name
+  el.innerHTML += `
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;background:var(--s2);border:1px dashed var(--b2);border-radius:8px;padding:9px 11px">
+      <input type="checkbox" id="tc_custom" onchange="toggleCustomTab(this)" style="width:16px;height:16px;accent-color:var(--lime);flex-shrink:0"/>
+      <input id="customTabName" placeholder="Other tab name…" style="background:none;border:none;color:var(--tx);font-family:'IBM Plex Mono',monospace;font-size:11px;flex:1;outline:none" />
+    </label>`;
+  renderColConfigs();
+}
+function toggleCustomTab(cb){
+  const name=document.getElementById('customTabName').value.trim();
+  if(cb.checked&&name){ tabCfg.push({name,nameCol:'A',priceCol:'D',unitCol:'C',active:true}); renderTabCheckboxes(); }
+  else{ tabCfg=tabCfg.filter(t=>t.name!==name); renderTabCheckboxes(); }
+}
+function renderColConfigs(){
+  const el=document.getElementById('tabColConfigs');
+  const active=tabCfg.filter(t=>t.active);
+  el.innerHTML=active.map((t,i)=>{
+    const ri=tabCfg.indexOf(t);
+    return `<div style="background:var(--s2);border:1px solid var(--b2);border-radius:8px;padding:10px 11px">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--lime);margin-bottom:8px;letter-spacing:1px">${t.name}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">
+        <div><div style="font-family:'IBM Plex Mono',monospace;font-size:8px;color:var(--t2);margin-bottom:3px">NAME COL</div>
+          <input value="${t.nameCol}" maxlength="3" oninput="tabCfg[${ri}].nameCol=this.value.toUpperCase()" style="width:100%;background:var(--s3);border:1px solid var(--b2);color:var(--tx);padding:6px 8px;border-radius:6px;font-family:'IBM Plex Mono',monospace;font-size:12px;text-align:center"/></div>
+        <div><div style="font-family:'IBM Plex Mono',monospace;font-size:8px;color:var(--t2);margin-bottom:3px">PRICE COL</div>
+          <input value="${t.priceCol}" maxlength="3" oninput="tabCfg[${ri}].priceCol=this.value.toUpperCase()" style="width:100%;background:var(--s3);border:1px solid var(--b2);color:var(--tx);padding:6px 8px;border-radius:6px;font-family:'IBM Plex Mono',monospace;font-size:12px;text-align:center"/></div>
+        <div><div style="font-family:'IBM Plex Mono',monospace;font-size:8px;color:var(--t2);margin-bottom:3px">UNIT COL</div>
+          <input value="${t.unitCol||''}" maxlength="3" placeholder="—" oninput="tabCfg[${ri}].unitCol=this.value.toUpperCase()" style="width:100%;background:var(--s3);border:1px solid var(--b2);color:var(--tx);padding:6px 8px;border-radius:6px;font-family:'IBM Plex Mono',monospace;font-size:12px;text-align:center"/></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+function restoreSheetConfig(){
+  const saved=localStorage.getItem(K_SHEET);
+  if(!saved) return;
+  const s=JSON.parse(saved);
+  sheetId=s.sheetId||'';
+  tabCfg=s.tabCfg||tabCfg;
+  if(s.sheetUrl) document.getElementById('sheetUrl').value=s.sheetUrl;
+  renderTabCheckboxes();
+  if(sheetId&&gToken) loadIngredients();
+}
+
+// ─────────────────────────────────────────
+//  CONNECT SHEET
+// ─────────────────────────────────────────
+function connectSheet(){
+  const raw=document.getElementById('sheetUrl').value.trim();
+  const m=raw.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
+  if(!m&&raw.length<20){ showToast('⚠️ Enter a valid Google Sheet URL'); return; }
+  sheetId=m?m[1]:raw;
+  localStorage.setItem(K_SHEET,JSON.stringify({sheetId,sheetUrl:raw,tabCfg}));
+  if(gToken) loadIngredients();
+  else showToast('Sign in to Google first');
+}
+function resetSheet(){
+  sheetId=''; ingData=[];
+  document.getElementById('sheetConnected').style.display='none';
+  document.getElementById('sheetConfigCard').style.display='block';
+  checkReady();
+}
+
+// ─────────────────────────────────────────
+//  LOAD INGREDIENTS
+// ─────────────────────────────────────────
+async function loadIngredients(){
+  setSt('Loading ingredients from sheet…','load');
+  ingData=[];
+  const activeTabs=tabCfg.filter(t=>t.active);
+  try {
+    for(const tab of activeTabs){
+      const res=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(tab.name)}`,{headers:{Authorization:`Bearer ${gToken}`}});
+      if(!res.ok){ const e=await res.json(); console.warn(`Tab "${tab.name}":`,e.error?.message); continue; }
+      const data=await res.json();
+      const rows=data.values||[];
+      const ni=ci(tab.nameCol), pi=ci(tab.priceCol), ui=tab.unitCol?ci(tab.unitCol):-1;
+      rows.forEach((row,i)=>{
+        if(i===0) return; // skip header
+        const name=s(row[ni]); if(!name) return;
+        const rawPrice=s(row[pi]);
+        const price=parseFloat(rawPrice.replace(/[^0-9.]/g,''))||0;
+        const sheetUnit=ui>=0?s(row[ui]).toUpperCase():'';
+        ingData.push({name,price,sheetUnit,rawPrice,row:i,a1row:i+1,tab:tab.name,priceCol:tab.priceCol,nameCol:tab.nameCol});
+      });
+    }
+    // Show connected card
+    document.getElementById('sheetConfigCard').style.display='none';
+    const sc=document.getElementById('sheetConnected'); sc.style.display='flex';
+    const unique=[...new Set(ingData.map(x=>x.name))].length;
+    document.getElementById('sheetInfo').textContent=activeTabs.map(t=>t.name).join(' + ');
+    document.getElementById('sheetIngCount').textContent=`✓ ${unique} unique ingredients across ${activeTabs.length} tab${activeTabs.length!==1?'s':''}`;
+    setSt(`✓ ${unique} ingredients loaded — ready to scan`,'ok');
+    checkReady();
+  } catch(e){ setSt('Error: '+e.message,'err'); }
+}
+
+// ─────────────────────────────────────────
+//  FILE HANDLING
+// ─────────────────────────────────────────
+document.addEventListener('DOMContentLoaded',()=>{
+  document.getElementById('capIn').addEventListener('change',e=>addFiles(Array.from(e.target.files)));
+  document.getElementById('fileIn').addEventListener('change',e=>addFiles(Array.from(e.target.files)));
+  const dz=document.getElementById('dropZ');
+  dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('over');});
+  dz.addEventListener('dragleave',()=>dz.classList.remove('over'));
+  dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('over');addFiles(Array.from(e.dataTransfer.files).filter(f=>f.type.startsWith('image/')));});
+});
+function addFiles(files){
+  files.forEach(file=>{
+    const id=Date.now()+Math.random();
+    const r=new FileReader();
+    r.onload=ev=>{
+      const du=ev.target.result;
+      queue.push({id,name:file.name,b64:du.split(',')[1],mt:file.type||'image/jpeg',thumb:du,status:'queued',items:[],matches:[],err:''});
+      renderQueue(); checkReady();
+    };
+    r.readAsDataURL(file);
+  });
+}
+function rmFile(id){ queue=queue.filter(q=>q.id!=id); renderQueue(); checkReady(); }
+function renderQueue(){
+  const lbl={queued:'⏳ queued',processing:'⟳ processing…',done:'✓ done',error:'✗ error'};
+  document.getElementById('queueEl').innerHTML=queue.map(q=>`
+    <div class="qi ${q.status}">
+      <div class="qi-th">${q.thumb?`<img src="${q.thumb}"/>`:'📄'}</div>
+      <div class="qi-info"><div class="qi-name">${q.name}</div><div class="qi-st">${lbl[q.status]||q.status}${q.err?' — '+q.err:''}</div></div>
+      <button class="qi-del" onclick="rmFile('${q.id}')">✕</button>
+    </div>`).join('');
+}
+function checkReady(){ document.getElementById('analyzeBtn').disabled=!(queue.length>0&&gToken&&ingData.length>0); }
+
+// ─────────────────────────────────────────
+//  ANALYSIS
+// ─────────────────────────────────────────
+async function runAnalysis(){
+  freshToken(async()=>{
+    await loadIngredients();
+    if(!ingData.length){ setSt('No ingredients loaded','err'); return; }
+    document.getElementById('analyzeBtn').disabled=true;
+    document.getElementById('resultsEl').innerHTML='';
+    const queued=queue.filter(q=>q.status==='queued'||q.status==='error');
+    for(let i=0;i<queued.length;i++){
+      const inv=queued[i];
+      setSt(`[${i+1}/${queued.length}] Reading ${inv.name}…`,'load');
+      inv.status='processing'; renderQueue();
+      try{
+        inv.items=await extract(inv);
+        setSt(`[${i+1}/${queued.length}] Matching ${inv.items.length} items…`,'load');
+        // Use only unique ingredient names for matching
+        const uniqueIngs=[...new Map(ingData.map(x=>[x.name.toUpperCase(),x])).values()];
+        inv.matches=await matchItems(inv.items, uniqueIngs);
+        inv.status='done';
+      } catch(e){ inv.status='error'; inv.err=e.message; }
+      renderQueue();
+      renderBlock(inv);
+    }
+    const n=countApproved();
+    setSt(`✓ Done — ${n} update${n!==1?'s':''} ready to ${user.role==='admin'?'apply':'submit'}.`,'ok');
+    updateSticky();
+    document.getElementById('analyzeBtn').disabled=false;
+  });
+}
+
+async function extract(inv){
+  const text=await claude([{role:'user',content:[
+    {type:'image',source:{type:'base64',media_type:inv.mt,data:inv.b64}},
+    {type:'text',text:`You are reading a vendor invoice for a restaurant commissary.
+
+Extract every line item. For each item return:
+- name: ingredient/product name as written
+- qty: quantity purchased (number)
+- unit: unit of measure EXACTLY as written on invoice (CS, EA, LB, KG, CS, OZ, GAL, etc.)
+- unit_price: price PER SINGLE UNIT (if invoice shows line total, divide by qty)
+- line_total: total line cost
+- vendor: vendor/supplier name if visible, else ""
+
+IMPORTANT: Preserve units exactly — CS means CASE, EA means EACH, do not normalize.
+
+Return ONLY a JSON array, no other text:
+[{"name":"","qty":1,"unit":"CS","unit_price":0.00,"line_total":0.00,"vendor":""}]`}
+  ]}]);
+  return parseArr(text);
+}
+
+async function matchItems(items, ings){
+  const text=await claude([{role:'user',content:
+    `Match invoice line items to spreadsheet ingredients. Return ONLY a JSON array.
+
+INVOICE (index : "name" unit $unit_price):
+${items.map((it,i)=>`${i}: "${it.name}" ${it.unit||''} $${it.unit_price}`).join('\n')}
+
+SHEET INGREDIENTS (row : "name" sheetUnit $price):
+${ings.map(g=>`${g.row}: "${g.name}" ${g.sheetUnit||'?'} $${g.price}`).join('\n')}
+
+Instructions:
+- Match by ingredient name (handle abbreviations, brand names, alternate spellings)
+- Each invoice item gets AT MOST one sheet match
+- sheetRow = -1 if no good match
+- confidence: "high" | "medium" | "low"
+
+Return: [{"invoiceIndex":0,"sheetRow":5,"confidence":"high"}]
+Return ONLY the JSON array.`
+  }]);
+  const raw=parseArr(text);
+  return items.map((item,i)=>{
+    const m=raw.find(r=>r.invoiceIndex===i);
+    const ing=(m&&m.sheetRow>=0)?ings.find(g=>g.row===m.sheetRow):null;
+    const unitInfo=ing?analyzeUnits(item,ing):null;
+    return {item,ing,confidence:m?m.confidence:'none',unitInfo,approved:!!(ing&&(!unitInfo||unitInfo.ok))};
+  });
+}
+
+// ─────────────────────────────────────────
+//  UNIT ANALYSIS
+// ─────────────────────────────────────────
+function analyzeUnits(invoiceItem, sheetIng){
+  const iu=(invoiceItem.unit||'').toUpperCase().trim();
+  const su=(sheetIng.sheetUnit||'').toUpperCase().trim();
+  if(!iu||!su) return {ok:true,note:'Unit data missing from sheet or invoice — verify manually',level:'warn'};
+  if(iu===su) return {ok:true,note:`Units match: ${iu}`,level:'ok',converted:null};
+
+  // Find groups
+  const ig=getGroup(iu), sg=getGroup(su);
+  if(!ig||!sg){ return {ok:false,note:`⚠ Invoice unit "${iu}" vs sheet unit "${su}" — different units, review before applying`,level:'mismatch'}; }
+  if(ig!==sg){ return {ok:false,note:`⚠ Unit category mismatch: invoice is ${ig} (${iu}), sheet is ${sg} (${su}) — prices are NOT comparable`,level:'mismatch'}; }
+
+  // Same group — convert both to common base
+  let convNote='';
+  if(ig==='weight'){
+    const iOz=(TO_OZ[iu]||1)*invoiceItem.qty, sOz=TO_OZ[su]||1;
+    const pricePerOz=invoiceItem.unit_price/( TO_OZ[iu]||1 );
+    convNote=`Converted: $${pricePerOz.toFixed(4)}/oz · invoice ${invoiceItem.qty}${iu} = ${iOz.toFixed(2)}oz`;
+  } else if(ig==='volume'){
+    const iFl=(TO_FLOZ[iu]||1)*invoiceItem.qty;
+    const pricePerFloz=invoiceItem.unit_price/(TO_FLOZ[iu]||1);
+    convNote=`Converted: $${pricePerFloz.toFixed(4)}/fl oz · invoice ${invoiceItem.qty}${iu} = ${iFl.toFixed(2)}fl oz`;
+  } else {
+    convNote=`Both are ${ig} units — verify qty: invoice ${iu} vs sheet ${su}`;
+  }
+  return {ok:false,note:`⚠ Units differ (same category): invoice ${iu} vs sheet ${su}. ${convNote}`,level:'warn',invoiceUnit:iu,sheetUnit:su};
+}
+
+function getGroup(u){
+  for(const [grp,units] of Object.entries(UNIT_GROUPS)){
+    if(units.includes(u)) return grp;
+  }
+  return null;
+}
+
+// ─────────────────────────────────────────
+//  RENDER BLOCKS
+// ─────────────────────────────────────────
+function renderBlock(inv){
+  const container=document.getElementById('resultsEl');
+  let el=document.getElementById('rb_'+inv.id);
+  if(!el){ el=document.createElement('div'); el.id='rb_'+inv.id; container.appendChild(el); }
+  if(inv.status==='error'){ el.innerHTML=`<div class="rb"><div class="rb-hdr"><span>❌</span><div class="rb-info"><div class="rb-name">${inv.name}</div><div class="rb-meta" style="color:var(--red)">${inv.err}</div></div></div></div>`; return; }
+  const matched=inv.matches.filter(m=>m.ing).length;
+  const warns=inv.matches.filter(m=>m.unitInfo&&m.unitInfo.level!=='ok'&&m.unitInfo.level!=='null').length;
+  const vendor=inv.items[0]?.vendor?' · '+inv.items[0].vendor:'';
+  el.innerHTML=`
+    <div class="rb" id="rbl_${inv.id}">
+      <div class="rb-hdr" onclick="document.getElementById('rbl_${inv.id}').classList.toggle('coll')">
+        <span style="font-size:17px">🧾</span>
+        <div class="rb-info">
+          <div class="rb-name">${inv.name}${vendor}</div>
+          <div class="rb-meta">${inv.items.length} items · ${matched} matched${warns>0?' · ⚠️ '+warns+' unit issue'+(warns>1?'s':''):''}</div>
+        </div>
+        <div style="display:flex;gap:4px;flex-shrink:0">
+          <span class="pill p-grn">${matched}✓</span>
+          ${inv.items.length-matched>0?`<span class="pill p-red">${inv.items.length-matched}✗</span>`:''}
+          ${warns>0?`<span class="pill p-amb">⚠${warns}</span>`:''}
+        </div>
+        <span class="chev">▾</span>
+      </div>
+      <div class="rb-body">${inv.matches.map((m,mi)=>buildRow(m,mi,inv.id)).join('')}</div>
+    </div>`;
+  el.querySelectorAll('input[type=checkbox][data-key]').forEach(cb=>{
+    cb.addEventListener('change',e=>{
+      const[iid,idx]=e.target.dataset.key.split('_');
+      const q=queue.find(x=>x.id==iid);
+      if(q) q.matches[+idx].approved=e.target.checked;
+      updateSticky();
+    });
+  });
+}
+
+function buildRow(m,mi,invId){
+  const{item:it,ing,confidence,unitInfo,approved}=m;
+  const cmap={high:'p-grn',medium:'p-lime',low:'p-amb',none:'p-red'};
+  const clbl={high:'✓ matched',medium:'~ fuzzy',low:'~ low',none:'✗ none'};
+
+  // Price display
+  let ph='<span class="p-eq">—</span>';
+  if(ing){
+    const old=ing.price,nw=it.unit_price;
+    if(!old||old===0) ph=`<div class="p-nw">$${nw.toFixed(2)}</div><div class="p-pct">new</div>`;
+    else if(nw>old) ph=`<div class="p-old">$${old.toFixed(2)}</div><div class="p-up">$${nw.toFixed(2)}</div><div class="p-pct">▲${((nw-old)/old*100).toFixed(1)}%</div>`;
+    else if(nw<old) ph=`<div class="p-old">$${old.toFixed(2)}</div><div class="p-dn">$${nw.toFixed(2)}</div><div class="p-pct">▼${((old-nw)/old*100).toFixed(1)}%</div>`;
+    else ph=`<div class="p-eq">$${nw.toFixed(2)}</div><div class="p-pct">no change</div>`;
+  }
+
+  // Unit block
+  let unitBlock='';
+  if(unitInfo){
+    if(unitInfo.level==='ok') unitBlock=`<div class="unit-ok">✓ ${unitInfo.note}</div>`;
+    else if(unitInfo.level==='mismatch') unitBlock=`<div class="unit-warn">🚨 ${unitInfo.note}</div>`;
+    else if(unitInfo.level==='warn') unitBlock=`<div class="unit-warn">⚠️ ${unitInfo.note}</div>`;
+  }
+
+  // Disable checkbox if unit mismatch (require manual decision)
+  const hardMismatch=unitInfo&&unitInfo.level==='mismatch';
+
+  return `<div class="mr">
+    <div class="mr-cb"><input type="checkbox" data-key="${invId}_${mi}" ${approved&&!hardMismatch?'checked':''} ${(!ing||hardMismatch)?'disabled':''}/></div>
+    <div class="mr-body">
+      <div class="mr-inv">${it.name}</div>
+      <div class="mr-inv-detail">
+        Invoice: <strong>${it.qty} ${it.unit||'?'}</strong> @ $${it.unit_price.toFixed(2)}/${it.unit||'unit'}
+        ${it.line_total?' · line total $'+Number(it.line_total).toFixed(2):''}
+        ${it.vendor?' · '+it.vendor:''}
+      </div>
+      ${ing?`<div class="mr-sheet">→ <strong>${ing.name}</strong> · sheet unit: <strong>${ing.sheetUnit||'—'}</strong> · current price: $${ing.price.toFixed(2)} <span class="pill ${cmap[confidence]}" style="font-size:9px">${clbl[confidence]}</span></div>`
+          :`<div class="mr-sheet" style="color:var(--t3);font-size:11px;font-style:italic">No match found in sheet</div>`}
+      ${unitBlock}
+      ${hardMismatch?`<div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--red);margin-top:5px">Cannot auto-apply — unit mismatch requires manual review</div>`:''}
+    </div>
+    <div class="mr-price">${ph}</div>
+  </div>`;
+}
+
+// ─────────────────────────────────────────
+//  STICKY / APPLY
+// ─────────────────────────────────────────
+function countApproved(){ let n=0; queue.forEach(q=>q.matches.forEach(m=>{if(m.approved&&m.ing)n++;})); return n; }
+function updateSticky(){
+  const n=countApproved();
+  document.getElementById('sticky').classList.toggle('on',n>0);
+  const isAdmin=user?.role==='admin';
+  document.getElementById('stickT').textContent=isAdmin?`Apply ${n} Update${n!==1?'s':''} to Sheet`:`Submit ${n} Update${n!==1?'s':''} for Approval`;
+  document.getElementById('stickS').textContent=isAdmin?'Updates all selected sheet tabs':'Admin will review before sheet is updated';
+}
+function handleApply(){ user.role==='admin'?applyDirect():submitApproval(); }
+
+function submitApproval(){
+  const items=[];
+  queue.forEach(q=>q.matches.forEach(m=>{ if(!m.approved||!m.ing)return; items.push({ingredientName:m.ing.name,oldPrice:m.ing.price,newPrice:m.item.unit_price,invoiceUnit:m.item.unit,sheetUnit:m.ing.sheetUnit,unitInfo:m.unitInfo}); }));
+  if(!items.length)return;
+  const entry={id:Date.now().toString(),date:new Date().toISOString(),location:user.name,locationShort:user.short,invoiceName:queue.find(q=>q.status==='done')?.name||'Invoice',items,status:'pending'};
+  pending.push(entry);
+  localStorage.setItem(K_PEND,JSON.stringify(pending));
+  updatePBadge(); renderPending();
+  document.getElementById('sticky').classList.remove('on');
+  setSt('✓ Submitted for admin approval','ok');
+  showToast('✓ Submitted for approval');
+}
+
+async function applyDirect(){
+  freshToken(async()=>{
+    const matches=[];
+    queue.forEach(q=>q.matches.forEach(m=>{ if(m.approved&&m.ing) matches.push(m); }));
+    setSt('Applying to Google Sheets…','load');
+    try{
+      await pushToSheets(matches);
+      document.getElementById('sticky').classList.remove('on');
+      setSt(`✓ ${matches.length} prices updated across your sheet tabs`,'ok');
+      showToast(`✓ ${matches.length} prices updated`);
+    } catch(e){ setSt('Error: '+e.message,'err'); }
+  });
+}
+
+async function pushToSheets(matches){
+  const ranges=[];
+  for(const m of matches){
+    // Update in every active tab where this ingredient appears
+    const allEntries=ingData.filter(x=>x.name.toUpperCase()===m.ing.name.toUpperCase());
+    allEntries.forEach(entry=>{
+      ranges.push({range:`${entry.tab}!${entry.priceCol}${entry.a1row}`,values:[[m.item.unit_price]]});
+    });
+  }
+  if(!ranges.length) throw new Error('No ranges to update');
+  const res=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values:batchUpdate`,{method:'POST',headers:{Authorization:`Bearer ${gToken}`,'Content-Type':'application/json'},body:JSON.stringify({valueInputOption:'RAW',data:ranges})});
+  if(!res.ok){ const e=await res.json(); throw new Error(e.error?.message||'Sheet update failed'); }
+}
+
+// ─────────────────────────────────────────
+//  PENDING
+// ─────────────────────────────────────────
+function renderPending(){
+  const el=document.getElementById('pendingEl');
+  const isAdmin=user?.role==='admin';
+  document.getElementById('pendingLbl').textContent=isAdmin?'Pending Approvals':'My Submissions';
+  const list=isAdmin?pending.filter(p=>p.status==='pending'):pending.filter(p=>p.location===user?.name);
+  if(!list.length){ el.innerHTML=`<div class="empty"><div class="empty-ic">✅</div><div class="empty-t">${isAdmin?'No pending approvals':'No submissions yet'}</div></div>`; return; }
+  const scol={pending:'var(--amb)',approved:'var(--grn)',rejected:'var(--red)'};
+  el.innerHTML=list.map(p=>`
+    <div class="pcard">
+      <div class="pcard-hdr">
+        <div><div class="pcard-loc">${isAdmin?p.locationShort:p.invoiceName}</div><div class="pcard-date">${fmt(p.date)}${isAdmin?' · '+p.invoiceName:''}</div></div>
+        <span class="pill" style="background:${scol[p.status]||'var(--t2)'}18;color:${scol[p.status]||'var(--t2)'}">${p.status.toUpperCase()}</span>
+      </div>
+      <div class="pcard-items">${p.items.map(i=>`${i.ingredientName}  ${i.invoiceUnit||'?'} → sheet:${i.sheetUnit||'?'}  $${(i.oldPrice||0).toFixed(2)} → $${i.newPrice.toFixed(2)}${i.unitInfo&&i.unitInfo.level!=='ok'?' ⚠️':''}`).join('\n')}</div>
+      ${isAdmin&&p.status==='pending'?`<div class="pcard-acts"><button class="pa" onclick="approvePending('${p.id}')">✓ Apply to Sheet</button><button class="pr" onclick="rejectPending('${p.id}')">✕ Reject</button></div>`:''}
+    </div>`).join('');
+}
+function updatePBadge(){ const n=pending.filter(p=>p.status==='pending').length; const b=document.getElementById('pbadge'); b.textContent=n; b.classList.toggle('on',n>0&&user?.role==='admin'); }
+
+async function approvePending(id){
+  const entry=pending.find(p=>p.id===id); if(!entry)return;
+  freshToken(async()=>{
+    try{
+      // Reload ing data so we have fresh row refs
+      await loadIngredients();
+      const fakeMatches=entry.items.map(i=>({ item:{unit_price:i.newPrice}, ing:ingData.find(x=>x.name.toUpperCase()===i.ingredientName.toUpperCase()) })).filter(m=>m.ing);
+      await pushToSheets(fakeMatches);
+      entry.status='approved';
+      localStorage.setItem(K_PEND,JSON.stringify(pending));
+      renderPending(); updatePBadge();
+      showToast('✓ Applied to Google Sheets');
+    } catch(e){ showToast('Error: '+e.message); }
+  });
+}
+function rejectPending(id){ const e=pending.find(p=>p.id===id); if(e){e.status='rejected';localStorage.setItem(K_PEND,JSON.stringify(pending));} renderPending(); updatePBadge(); showToast('Rejected'); }
+
+// ─────────────────────────────────────────
+//  CLAUDE PROXY
+// ─────────────────────────────────────────
+async function claude(messages){
+  const res=await fetch(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:2000,messages})});
+  const data=await res.json();
+  if(data.error) throw new Error(data.error.message);
+  return data.content.map(b=>b.text||'').join('').trim();
+}
+function parseArr(txt){ const c=txt.replace(/```json|```/g,'').trim(); const a=c.indexOf('['),z=c.lastIndexOf(']'); if(a<0||z<0) throw new Error('No JSON array in response'); return JSON.parse(c.slice(a,z+1)); }
+
+// ─────────────────────────────────────────
+//  STATUS / TOAST / UTILS
+// ─────────────────────────────────────────
+function setSt(msg,type){ const icons={ok:'✓',err:'⚠',load:'',warn:'⚠'}; document.getElementById('statusEl').innerHTML=`<div class="st ${type}">${type==='load'?'<div class="spin"></div>':''}${icons[type]||''} ${msg}</div>`; }
+function clearSt(){ document.getElementById('statusEl').innerHTML=''; }
+let tt; function showToast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('on'); clearTimeout(tt); tt=setTimeout(()=>t.classList.remove('on'),2800); }
+function ci(l){ let i=0; for(const c of l.toUpperCase()) i=i*26+(c.charCodeAt(0)-64); return i-1; }
+function s(v){ return String(v||'').trim(); }
+function fmt(d){ return new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); }
+</script>
+</body>
+</html>
